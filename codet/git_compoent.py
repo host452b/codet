@@ -120,7 +120,16 @@ class GitAnalyzer:
             # pprint(repo.tags)
             # pprint(repo.tree)
             # pprint(repo.branches)
-            all_commits = list(repo.iter_commits(repo.active_branch,since=since_date, no_merges=True))
+            try:
+                # Try to get the active branch
+                # This handles normal repositories with a current branch
+                branch = repo.active_branch
+                all_commits = list(repo.iter_commits(branch, since=since_date, no_merges=True))
+            except TypeError:
+                # Handle detached HEAD state (when not on any branch)
+                # This prevents errors when in a detached HEAD state, such as when checking out a specific commit
+                branch = repo.head.commit
+                all_commits = list(repo.iter_commits(branch, since=since_date, no_merges=True))
             
             for commit in tqdm(all_commits, desc=f"Processing {repo_name} commit records"):
                 # Store commit information in variables
