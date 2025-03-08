@@ -5,10 +5,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="codet",
-    version="0.2.0",
+    version="0.3.0",
     author="clemente0620",
     author_email="clemente0620@gmail.com",
-    description="一个跨平台的命令行文件处理工具",
+    description="A cross-platform command-line tool for file processing and Git repository analysis with support for commit history tracking, code hotspot detection, and customizable filtering options",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/clemente0731/codet",
@@ -27,7 +27,11 @@ setup(
     ],
     python_requires=">=3.6",
     install_requires=[
-        "click>=8.0.0",
+        "colorlog>=6.0.0",
+        "gitpython>=3.1.0",
+        "typing>=3.7.4",
+        "prettytable>=3.12.0",
+        "tqdm>=4.60.0",
     ],
     entry_points={
         "console_scripts": [
