@@ -451,5 +451,5 @@ the output should not include the above rules and requirements; it should be nat
                         f.write(f"Commit URL: {commit_data['commit_url']}\n\n")
             
         self.logger.info(f"Git patch/diff report generated: {output_file}")
-        self.logger.info(f"\033[1;32mFile path: {os.path.abspath(output_file)}\033[0m")
+        self.logger.info(f"\033[1;33m\033[1mFile path: {os.path.abspath(output_file)}\033[0m")
         self.logger.info(f"This report can be opened directly in Cursor for code change analysis or integrated with various LLM Agent tools")
