@@ -30,6 +30,7 @@ MANIFEST
 *.spec
 
 # Installer logs
+git_patch_report_*.diff
 pip-log.txt
 pip-delete-this-directory.txt
 

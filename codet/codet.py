@@ -326,8 +326,26 @@ class CodeTrailExecutor:
         table.align["Changes"] = "r"  # Right align
         
         # Get max width for each column
-        max_dir_width = max(len(dir_key) for dir_key in dir_files.keys())
-        max_file_width = max(len(file_path) for files in dir_files.values() for file_path, _ in files)
+        # get max width for directory column
+        # check if dir_files is empty
+        if not dir_files:
+            self.logger.info("No matching files found in hotspot analysis")
+            return
+            
+        # get max width for directory column
+        max_dir_width = 0
+        for dir_key in dir_files.keys():
+            if len(dir_key) > max_dir_width:
+                max_dir_width = len(dir_key)
+                
+        # get max width for file path column 
+        max_file_width = 0
+        for files in dir_files.values():
+            for file_path, _ in files:
+                if len(file_path) > max_file_width:
+                    max_file_width = len(file_path)
+                    
+        # fixed width for changes count column
         max_count_width = 10
         
         # Add data to table by directory
