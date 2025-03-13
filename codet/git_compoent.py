@@ -194,8 +194,9 @@ class GitAnalyzer:
                 # Create variable to store all diff information for single commit
                 commit_diffs_txt = ""
                 # 如果需要完整的函数上下文，则设置function_context=True
-                for diff_item in commit.diff(parent_commit, create_patch=True, unified=20, function_context=False):
-                    # print(f"  [Commit Diff Item - File Path]: {diff_item.a_path} -> {diff_item.b_path}")
+                # get diff between parent commit and current commit
+                for diff_item in parent_commit.diff(commit, create_patch=True, unified=20, function_context=False):
+                    # print(f"  [Commit Diff Item - File Path]: {diff_item.b_path} -> {diff_item.a_path}")
                     # print(f"  [Commit Diff Item - Diff Content]: {diff_item.diff}")
                     # print(f"  [Commit Diff Item - File Status]: deleted_file = {diff_item.deleted_file} - Indicates whether this file was deleted in this commit")
                     # print(f"  [Commit Diff Item - File Status]: new_file = {diff_item.new_file} - Indicates whether this is a newly created file in this commit")
@@ -203,7 +204,7 @@ class GitAnalyzer:
                     # print(f"  [Commit Diff Item - Source Path]: a_path = {diff_item.a_path} - The file path before the change (in parent commit)")
                     # print(f"  [Commit Diff Item - Target Path]: b_path = {diff_item.b_path} - The file path after the change (in current commit)")
 
-                    # Convert binary diff content to string and split by lines for readability
+                    # convert binary diff content to string and split by lines for readability 
                     if diff_item.diff:
                         diff_text = diff_item.diff.decode('utf-8', errors='replace')
                         # self.logger.info(diff_text)
