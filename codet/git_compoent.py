@@ -195,7 +195,7 @@ class GitAnalyzer:
                 commit_diffs_txt = ""
                 # 如果需要完整的函数上下文，则设置function_context=True
                 # get diff between parent commit and current commit
-                for diff_item in parent_commit.diff(commit, create_patch=True, unified=20, function_context=False):
+                for diff_item in parent_commit.diff(commit, create_patch=True, unified=20, function_context=True):
                     # print(f"  [Commit Diff Item - File Path]: {diff_item.b_path} -> {diff_item.a_path}")
                     # print(f"  [Commit Diff Item - Diff Content]: {diff_item.diff}")
                     # print(f"  [Commit Diff Item - File Status]: deleted_file = {diff_item.deleted_file} - Indicates whether this file was deleted in this commit")
