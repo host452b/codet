@@ -384,6 +384,50 @@ class CodeTrailExecutor:
         self.logger.info("\n" + str(table))
         self.logger.info("\nHotspot analysis complete")
 
+    def ai_analysis(self, text_input):
+        from openai import AzureOpenAI
+        api_token = self.args.api_token
+        endpoint = self.args.openai_endpoint
+        llm_model = self.args.model
+        custom_prompt = self.args.custom_prompt
+
+        if custom_prompt:
+            print(f"CUSTOM PROMPT MESSAGE IS:\n\t: {custom_prompt}")
+            text_input += custom_prompt
+
+        if not (api_token and endpoint and llm_model):
+            self.logger.warning(">>-------> No API token or endpoint or model provided, skipping AI analysis <-------<< ")
+            return
+        
+        client = AzureOpenAI(
+            api_version="2024-02-15-preview",
+            azure_endpoint=endpoint,
+            api_key=api_token,
+        )
+        
+        chat_completion = client.chat.completions.create(
+            model=llm_model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": text_input,
+                }
+            ],
+            temperature=0.5,  # higher temperature means more creative
+            top_p=0.7,        # higher top_p means more creative
+            max_tokens=1024 * 4,  # max tokens to generate
+            stream=True,
+        )
+
+        full_reply = ""
+        for chunk in chat_completion:
+            if chunk.choices and chunk.choices[0].delta.content:
+                full_reply += chunk.choices[0].delta.content
+        print("=========================================== ????????????????? ")
+        print(full_reply)
+        return full_reply
+
+
     def generate_report(self):
         """
         Generate a comprehensive git patch/diff report file based on analyzed commits
@@ -405,68 +449,124 @@ class CodeTrailExecutor:
         output_file = os.path.join(os.getcwd(), f"git_patch_report_{timestamp}.diff")
         
         with open(output_file, 'w', encoding='utf-8') as f:
-            # Write header
-            f.write(f"# Git Patch/Diff Report\n")
-            f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            # write report header: general info for the whole report
+            f.write("# Git Patch/Diff Report\n")
+            f.write("# Generated: {0}\n\n".format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
             
-            # Process each repository
+            # iterate over each repository and its commits
             for repo_name, commits in self.cooked_commits.items():
                 if not commits:
                     continue
-                    
-                f.write(f"===============================================================================\n")
-                f.write(f"Repository: {repo_name}\n")
-                f.write(f"===============================================================================\n\n")
-                
-                # Process each commit
-                for commit_hash, commit_data in commits.items():
-                    # Write commit metadata
-                    f.write(f"-------------------------------------------------------------------------------\n")
-                    f.write(f"Commit: {commit_hash}\n")
-                    f.write(f"Author: {commit_data.get('commit_author', 'Unknown')} <{commit_data.get('commit_email', 'Unknown')}>\n")
-                    f.write(f"Date: {commit_data.get('commit_date', 'Unknown')}\n\n")
-                    
-                    # Write commit message
-                    f.write(f"Commit Message:\n")
-                    f.write(f"{commit_data.get('commit_message', 'No message')}\n\n")
-                    
-                    # Write analysis prompt
-                    pre_prompt = """
-As an expert in the current {0} project, you need analyze the Git commit message and diff info related to '{1}' feature. Answer these questions:
-1. What are the main changes in this commit for {0}.
-2. What problems might these changes solve for {0}.
-3. Extract key info from the commit message and explain how it describes the code submission for {0}.
-4. Analyze the relationship between the submitted code and its description. Point out which code implements the goals in the commit message for {0}.
-5. Evaluate the impact of this commit on the project. Which files or functionalities are affected for {0}. 
-6. Explain the context and significance of this commit. Does it address issues or implement new features for {0}.
-7. If there are changes involving "tests/trt-test-defs/", please briefly mention the impact of these changes for {0}.
-8. Don't explaining abbreviations.
 
-the output should not include the above rules and requirements; it should be naturally integrated.
-""".format(repo_name, self.args.keyword if hasattr(self, 'args') and hasattr(self.args, 'keyword') else "")
+                # section header for each repository
+                f.write("===============================================================================\n")
+                f.write("Repository: {0}\n".format(repo_name))
+                f.write("===============================================================================\n\n")
+
+                ai_input_text = ""
+                # process each commit in the current repository
+                for commit_hash, commit_data in commits.items():
+                    # section for each commit's raw data
+                    f.write("-------------------------------------------------------------------------------\n")
+                    f.write("Commit: {0}\n".format(commit_hash))
+                    f.write("Author: {0} <{1}>\n".format(
+                        commit_data.get('commit_author', 'Unknown'),
+                        commit_data.get('commit_email', 'Unknown')
+                    ))
+                    f.write("Date: {0}\n\n".format(commit_data.get('commit_date', 'Unknown')))
                     
-                    f.write("Analysis Context:\n")
+                    # write commit message section
+                    f.write("Commit Message:\n")
+                    f.write("{0}\n\n".format(commit_data.get('commit_message', 'No message')))
+                    
+                    # write analysis context prompt for AI (for transparency)
+                    # this is the prompt that will be used for AI analysis
+                    pre_prompt = (
+                        "\n"
+                        "As an expert in the current {0} project, you need analyze the Git commit message and diff info related to '{1}' feature. Answer these questions:\n"
+                        "1. What are the main changes in this commit for {0}.\n"
+                        "2. What problems might these changes solve for {0}.\n"
+                        "3. Extract key info from the commit message and explain how it describes the code submission for {0}.\n"
+                        "4. Analyze the relationship between the submitted code and its description. Point out which code implements the goals in the commit message for {0}.\n"
+                        "5. Evaluate the impact of this commit on the project. Which files or functionalities are affected for {0}.\n"
+                        "6. Explain the context and significance of this commit. Does it address issues or implement new features for {0}.\n"
+                        "7. If there are changes involving \"tests/trt-test-defs/\", please briefly mention the impact of these changes for {0}.\n"
+                        "8. Don't explaining abbreviations.\n"
+                        "\n"
+                        "the output should not include the above rules and requirements; it should be naturally integrated.\n"
+                    ).format(
+                        repo_name,
+                        self.args.keyword if hasattr(self, 'args') and hasattr(self.args, 'keyword') else ""
+                    )
+                    
+                    # clearly mark the start of the analysis context for this commit
+                    f.write("# --------- Analysis Context (for AI) ---------\n")
                     f.write(pre_prompt)
                     f.write("\n\n")
                     
-                    # Write changed files list
+                    # write changed files section if available
                     if 'commit_changed_files' in commit_data and commit_data['commit_changed_files']:
-                        f.write("Changed Files:\n")
+                        f.write("# --------- Changed Files ---------\n")
                         for file_path in commit_data['commit_changed_files']:
-                            f.write(f"  - {file_path}\n")
+                            f.write("  - {0}\n".format(file_path))
                         f.write("\n")
                     
-                    # Write the actual git diff/patch content
+                    # write git diff/patch section if available
                     if 'commit_diff_text' in commit_data and commit_data['commit_diff_text']:
-                        f.write("Git Patch/Diff:\n")
+                        f.write("# --------- Git Patch/Diff ---------\n")
                         f.write(commit_data['commit_diff_text'])
                         f.write("\n\n")
                     else:
-                        f.write("No diff information available for this commit\n\n")
+                        f.write("# --------- No diff information available for this commit ---------\n\n")
                     
-                    # Write commit URL if available
+                    # write commit URL if available
                     if 'commit_url' in commit_data and commit_data['commit_url']:
-                        f.write(f"Commit URL: {commit_data['commit_url']}\n\n")
+                        f.write("# --------- Commit URL ---------\n")
+                        f.write("{0}\n\n".format(commit_data['commit_url']))
+
+                    # accumulate text for AI analysis (for this repository)
+                    ai_input_text += (
+                        "Repository: {0}\n"
+                        "Commit: {1}\n"
+                        "Author: {2} <{3}>\n"
+                        "Date: {4}\n"
+                        "Commit Message:\n{5}\n"
+                        "{6}\n"
+                    ).format(
+                        repo_name,
+                        commit_hash,
+                        commit_data.get('commit_author', 'Unknown'),
+                        commit_data.get('commit_email', 'Unknown'),
+                        commit_data.get('commit_date', 'Unknown'),
+                        commit_data.get('commit_message', 'No message'),
+                        pre_prompt
+                    )
+                    if 'commit_changed_files' in commit_data and commit_data['commit_changed_files']:
+                        ai_input_text += "Changed Files:\n"
+                        for file_path in commit_data['commit_changed_files']:
+                            ai_input_text += "  - {0}\n".format(file_path)
+                    if 'commit_diff_text' in commit_data and commit_data['commit_diff_text']:
+                        ai_input_text += "Git Patch/Diff:\n"
+                        ai_input_text += commit_data['commit_diff_text'] + "\n"
+                    if 'commit_url' in commit_data and commit_data['commit_url']:
+                        ai_input_text += "Commit URL: {0}\n".format(commit_data['commit_url'])
+                    ai_input_text += "\n"
+
+                    # call ai_analysis for this repository if there is any input
+                    ai_output = None
+                    if ai_input_text.strip():
+                        try:
+                            ai_output = self.ai_analysis(ai_input_text)
+                        except Exception as e:
+                            self.logger.warning("AI analysis failed for repository {0}: {1}".format(repo_name, e))
+                            ai_output = None
+
+                    # write AI analysis output section, clearly separated from raw data
+                    if ai_output:
+                        f.write("===============================================================================\n")
+                        f.write("# ===================== AI Analysis Output (LLM Generated) =====================\n")
+                        f.write(ai_output)
+                        f.write("\n")
             
         self.logger.info(f"Git patch/diff report generated: {output_file}")
         self.logger.info(f"\033[1;33m\033[1mFile path: {os.path.abspath(output_file)}\033[0m")

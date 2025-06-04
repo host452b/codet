@@ -88,6 +88,9 @@ def main():
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {codet.__version__}"
     )
+    #########################################################
+    ### BASIC OPTIONS
+    #########################################################
     parser.add_argument(
         "-d",
         "--days",
@@ -144,7 +147,7 @@ def main():
         "-s",
         "--hotspot",
         action="store_true",
-        default=False,
+        default=True,
         help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} Count changes in files and directories within search scope to identify active areas (default: False)"
     )
     parser.add_argument(
@@ -155,6 +158,52 @@ def main():
         default="union",
         help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} Search mode: union (match any condition) or intersection (match all conditions) (default: union)"
     )
+    #########################################################
+    # AI PART OPTIONS
+    #########################################################
+    # add openai model argument
+    parser.add_argument(
+        "-mo",
+        "--model",
+        type=str,
+        default="gpt-4.1-20250414",
+        help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} Specify the openai model to use (default: gpt-4.1-20250414)"
+    )
+    # add api-token argument for AI analysis
+    parser.add_argument(
+        "-to",
+        "--api-token",
+        type=str,
+        default=None,
+        help=(
+            f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} If token is not set or is incorrectly configured, AI analysis will be skipped. "
+            "If the environment variable AI_API_TOKEN is set, it will override this value."
+        ),
+    )
+    # add openai endpoint argument
+    parser.add_argument(
+        "-oe",
+        "--openai-endpoint",
+        type=str,
+        default=None,
+        help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} Specify the openai endpoint (default: None)"
+    )
+    # add custom prompt argument
+    parser.add_argument(
+        "-cp",
+        "--custom-prompt",
+        type=str,
+        default=None,
+        help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} Specify a custom prompt message for the user (default: empty)"
+    )
+    # check environment variable and override argument default if present
+    api_token_env = os.getenv("AI_API_TOKEN")
+    if api_token_env is not None:
+        parser.set_defaults(api_token=api_token_env)
+
+    #########################################################
+    ### print help if no arguments are provided
+    #########################################################
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(0)
