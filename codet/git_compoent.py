@@ -11,6 +11,7 @@ from typing import List, Dict, Any, Optional, Set
 from git.repo import Repo
 from collections import OrderedDict
 from pprint import pprint
+from tqdm import tqdm
 
 class GitAnalyzer:
     """Git repository operation wrapper class, supports handling multiple repositories simultaneously"""
@@ -108,7 +109,6 @@ class GitAnalyzer:
         since_date = datetime.now() - timedelta(days=days_back)
         
         # Iterate through all repositories to collect commit information
-        from tqdm import tqdm
         
         for repo_name, repo in tqdm(self.repo_meta.items(), desc="Processing repositories progress"):
             self.all_commits[repo_name] = OrderedDict()

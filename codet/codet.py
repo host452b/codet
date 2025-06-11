@@ -6,6 +6,7 @@ import json
 from typing import List, Dict, Any, Optional
 from codet.git_compoent import GitAnalyzer
 from collections import OrderedDict
+from tqdm import tqdm
 
 class CodeTrailExecutor:
     """Code trail executor for analyzing Git commit history"""
@@ -130,8 +131,9 @@ class CodeTrailExecutor:
             self.logger.info(f"  - User conditions: {', '.join(self.args.user) if self.args.user else 'none'} (must match if specified)")
             self.logger.info(f"  - Keyword conditions: {', '.join(self.args.keyword) if self.args.keyword else 'none'} (must match if specified)")
 
+        
         # Iterate through commits in all repos
-        for repo_name, commits in self.raw_commits.items():
+        for repo_name, commits in tqdm(self.raw_commits.items(), desc="Processing and cooking cook progress"):
             self.cooked_commits[repo_name] = {}
             
             # Iterate through all commits in this repo
@@ -223,7 +225,7 @@ class CodeTrailExecutor:
         table.align["Date"] = "r"  # Right align
         
         row_num = 1
-        for repo_name, commits in self.cooked_commits.items():
+        for repo_name, commits in tqdm(self.cooked_commits.items(), desc="Processing fillin table progress"):
             for commit_hash, commit_data in commits.items():
                 table.add_row([
                     row_num,
@@ -480,7 +482,7 @@ class CodeTrailExecutor:
 
                 ai_input_text = ""
                 # process each commit in the current repository
-                for commit_hash, commit_data in commits.items():
+                for commit_hash, commit_data in tqdm(commits.items(), desc="Generate a comprehensive git patch/diff report file based on analyzed commits"):
                     # section for each commit's raw data
                     f.write("-------------------------------------------------------------------------------\n")
                     f.write("Commit: {0}\n".format(commit_hash))
@@ -599,7 +601,7 @@ class CodeTrailExecutor:
 
         self.logger.info("Generating JSON reports for cooked commits...")
 
-        for repo_name, commits in self.cooked_commits.items():
+        for repo_name, commits in tqdm(self.cooked_commits.items(), desc="Processing and cooking generate_cook_json"):
             if not commits:
                 continue
 

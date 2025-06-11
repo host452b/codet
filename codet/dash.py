@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 import dash
-from dash import dcc, html, Input, Output, callback, dash_table
+from dash import dcc, html, Input, Output, callback, dash_table, State, callback_context
 import dash_bootstrap_components as dbc
 
 
@@ -78,18 +78,23 @@ class CodetDashboard:
                 if not isinstance(commit_info, dict):
                     continue
                     
-                # process commit data
+                # process commit data with robust date handling
                 commit_date = commit_info.get('commit_date', '')
                 if commit_date:
                     try:
                         if isinstance(commit_date, str):
                             # try different date formats
-                            for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                            for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d', '%Y-%m-%dT%H:%M:%S.%f']:
                                 try:
-                                    commit_date = datetime.strptime(commit_date, fmt)
+                                    commit_date = datetime.strptime(commit_date.split('+')[0], fmt)  # handle timezone
                                     break
                                 except ValueError:
                                     continue
+                            else:
+                                # if no format worked, try pandas
+                                commit_date = pd.to_datetime(commit_date, errors='coerce')
+                                if pd.isna(commit_date):
+                                    commit_date = datetime.now()
                         elif not isinstance(commit_date, datetime):
                             commit_date = datetime.now()
                     except:
@@ -130,6 +135,12 @@ class CodetDashboard:
         
         self.df_commits = pd.DataFrame(commits_data)
         self.df_files = pd.DataFrame(files_data)
+        
+        # ensure date columns are datetime type
+        if not self.df_commits.empty and 'date' in self.df_commits.columns:
+            self.df_commits['date'] = pd.to_datetime(self.df_commits['date'], errors='coerce')
+        if not self.df_files.empty and 'date' in self.df_files.columns:
+            self.df_files['date'] = pd.to_datetime(self.df_files['date'], errors='coerce')
         
         return len(commits_data) > 0
     
@@ -179,8 +190,8 @@ class CodetDashboard:
                         html.Label("📅 Date Range", className="fw-bold mb-2"),
                         dcc.DatePickerRange(
                             id='date-range-picker',
-                            start_date=self.df_commits['date'].min(),
-                            end_date=self.df_commits['date'].max(),
+                            start_date=self.df_commits['date'].min() if not self.df_commits.empty else None,
+                            end_date=self.df_commits['date'].max() if not self.df_commits.empty else None,
                             display_format='YYYY-MM-DD',
                             style={'width': '100%'}
                         )
@@ -195,7 +206,7 @@ class CodetDashboard:
                             id='author-dropdown',
                             options=[{'label': author, 'value': author} 
                                    for author in sorted(self.df_commits['author'].unique())],
-                            value=list(self.df_commits['author'].unique()),
+                            value=list(self.df_commits['author'].unique()) if not self.df_commits.empty else [],
                             multi=True,
                             placeholder="Select authors..."
                         )
@@ -210,7 +221,7 @@ class CodetDashboard:
                             id='repo-dropdown',
                             options=[{'label': repo, 'value': repo} 
                                    for repo in sorted(self.df_commits['repo_name'].unique())],
-                            value=list(self.df_commits['repo_name'].unique()),
+                            value=list(self.df_commits['repo_name'].unique()) if not self.df_commits.empty else [],
                             multi=True,
                             placeholder="Select repositories..."
                         )
@@ -225,7 +236,7 @@ class CodetDashboard:
                             id='filetype-dropdown',
                             options=[{'label': ext if ext else 'No Extension', 'value': ext} 
                                    for ext in sorted(self.df_files['file_ext'].unique())],
-                            value=list(self.df_files['file_ext'].unique()),
+                            value=list(self.df_files['file_ext'].unique()) if not self.df_files.empty else [],
                             multi=True,
                             placeholder="Select file types..."
                         )
@@ -240,6 +251,7 @@ class CodetDashboard:
             dbc.Tab(label="🔥 Hotspots", tab_id="hotspots"),
             dbc.Tab(label="📈 Timeline", tab_id="timeline"),
             dbc.Tab(label="📋 Details", tab_id="details"),
+            dbc.Tab(label="📄 JSON Browser", tab_id="json-browser"),
         ], id="main-tabs", active_tab="overview")
         
         # tab content
@@ -266,24 +278,90 @@ class CodetDashboard:
         )
         def update_tab_content(active_tab, start_date, end_date, selected_authors, 
                              selected_repos, selected_filetypes):
-            # filter data based on selections
-            filtered_commits = self._filter_data(
-                start_date, end_date, selected_authors, selected_repos
-            )
-            filtered_files = self._filter_files_data(
-                start_date, end_date, selected_authors, selected_repos, selected_filetypes
-            )
+            try:
+                # ensure selected values are not None
+                if selected_authors is None:
+                    selected_authors = list(self.df_commits['author'].unique()) if not self.df_commits.empty else []
+                if selected_repos is None:
+                    selected_repos = list(self.df_commits['repo_name'].unique()) if not self.df_commits.empty else []
+                if selected_filetypes is None:
+                    selected_filetypes = list(self.df_files['file_ext'].unique()) if not self.df_files.empty else []
+                
+                # filter data based on selections
+                filtered_commits = self._filter_data(
+                    start_date, end_date, selected_authors, selected_repos
+                )
+                filtered_files = self._filter_files_data(
+                    start_date, end_date, selected_authors, selected_repos, selected_filetypes
+                )
+                
+                if active_tab == "overview":
+                    return self._create_overview_tab(filtered_commits, filtered_files)
+                elif active_tab == "hotspots":
+                    return self._create_hotspots_tab(filtered_files)
+                elif active_tab == "timeline":
+                    return self._create_timeline_tab(filtered_commits)
+                elif active_tab == "details":
+                    return self._create_details_tab(filtered_commits)
+                elif active_tab == "json-browser":
+                    return self._create_json_browser_tab()
+                
+                return html.Div("Select a tab to view content")
+                
+            except Exception as e:
+                return dbc.Alert(f"Error loading content: {str(e)}", color="danger")
+        
+        # modal callbacks for AI Summary details
+        @callback(
+            [Output("detail-modal", "is_open"),
+             Output("modal-content", "children"),
+             Output("modal-title", "children")],
+            [Input("json-data-table", "active_cell"),
+             Input("close-modal", "n_clicks")],
+            [State("detail-modal", "is_open"),
+             State("json-data-table", "data")]
+        )
+        def toggle_modal(active_cell, close_clicks, is_open, table_data):
+            ctx = callback_context
+            if not ctx.triggered:
+                return False, "", "🤖 AI Analysis Details"
             
-            if active_tab == "overview":
-                return self._create_overview_tab(filtered_commits, filtered_files)
-            elif active_tab == "hotspots":
-                return self._create_hotspots_tab(filtered_files)
-            elif active_tab == "timeline":
-                return self._create_timeline_tab(filtered_commits)
-            elif active_tab == "details":
-                return self._create_details_tab(filtered_commits)
+            trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
             
-            return html.Div("Select a tab to view content")
+            if trigger_id == "close-modal":
+                return False, "", "🤖 AI Analysis Details"
+            
+            if trigger_id == "json-data-table" and active_cell:
+                if active_cell['column_id'] == 'AI Summary':
+                    row_index = active_cell['row']
+                    if row_index < len(table_data):
+                        row_data = table_data[row_index]
+                        commit_hash = row_data.get('Commit Hash', 'Unknown')
+                        repo = row_data.get('Repository', 'Unknown')
+                        author = row_data.get('Author', 'Unknown')
+                        
+                        # get full AI summary
+                        full_summary = row_data.get('Full AI Summary', row_data.get('AI Summary', ''))
+                        
+                        if not full_summary or full_summary.strip() == '*No AI analysis available*':
+                            full_summary = "🤔 **No detailed AI analysis available for this commit.**\n\nThis could mean:\n- The AI analysis hasn't been run yet\n- The analysis failed during processing\n- No meaningful insights were generated\n\nYou can try running the codet tool with AI analysis enabled to generate insights for this commit."
+                        
+                        # format the content with markdown-like structure
+                        formatted_content = f"""**Commit:** `{commit_hash}`
+**Repository:** {repo}
+**Author:** {author}
+
+---
+
+### 🤖 AI Analysis
+
+{full_summary}
+"""
+                        
+                        modal_title = f"🤖 AI Analysis - {repo} ({commit_hash})"
+                        return True, formatted_content, modal_title
+            
+            return is_open, "", "🤖 AI Analysis Details"
     
     def _filter_data(self, start_date, end_date, selected_authors, selected_repos):
         """Filter commits data based on selections"""
@@ -493,6 +571,270 @@ class CodetDashboard:
         
         return details_table
     
+    def _create_json_browser_tab(self):
+        """Create JSON browser tab to view raw data"""
+        if not self.data:
+            return dbc.Alert("No JSON data available.", color="info")
+        
+        # flatten JSON data for table display
+        table_data = []
+        for repo_name, commits in self.data.items():
+            if not isinstance(commits, dict):
+                continue
+                
+            for commit_hash, commit_info in commits.items():
+                if not isinstance(commit_info, dict):
+                    continue
+                
+                # format changed files as numbered list
+                changed_files = commit_info.get('commit_changed_files', [])
+                if changed_files:
+                    files_str = '\n'.join([f"{i+1}. {file}" for i, file in enumerate(changed_files)])
+                else:
+                    files_str = 'No files'
+                
+                # truncate long text fields for better display
+                def truncate_text(text, max_length=100):
+                    if not text:
+                        return ''
+                    return text[:max_length] + '...' if len(text) > max_length else text
+                
+                # special handling for files display - no truncation for files
+                def format_files_display(files_str, max_files=10):
+                    if not files_str or files_str == 'No files':
+                        return files_str
+                    lines = files_str.split('\n')
+                    if len(lines) > max_files:
+                        visible_lines = lines[:max_files]
+                        remaining = len(lines) - max_files
+                        return '\n'.join(visible_lines) + f'\n... and {remaining} more files'
+                    return files_str
+                
+                # format AI summary with markdown support and better structure
+                def format_ai_summary(text, max_length=300):
+                    if not text:
+                        return '*No AI analysis available*'
+                    
+                    # clean up the text
+                    cleaned_text = text.strip()
+                    
+                    # if text is too long, truncate smartly
+                    if len(cleaned_text) > max_length:
+                        # try to cut at sentence end
+                        truncated = cleaned_text[:max_length]
+                        last_period = truncated.rfind('.')
+                        last_newline = truncated.rfind('\n')
+                        
+                        if last_period > max_length * 0.7:  # if we can cut at a sentence
+                            cleaned_text = cleaned_text[:last_period + 1] + '\n\n*[Click to view full analysis]*'
+                        elif last_newline > max_length * 0.7:  # if we can cut at a line
+                            cleaned_text = cleaned_text[:last_newline] + '\n\n*[Click to view full analysis]*'
+                        else:
+                            cleaned_text = truncated + '...\n\n*[Click to view full analysis]*'
+                    
+                    # add some basic markdown formatting if not already present
+                    if not any(marker in cleaned_text for marker in ['**', '*', '`', '#']):
+                        # auto-format simple text
+                        sentences = [s.strip() for s in cleaned_text.split('.') if s.strip()]
+                        if len(sentences) > 1:
+                            formatted = f"**{sentences[0]}.**\n\n" + '. '.join(sentences[1:])
+                            if not formatted.endswith('.'):
+                                formatted += '.'
+                            cleaned_text = formatted
+                    
+                    return cleaned_text
+                
+                # create row index for detail viewing
+                row_index = len(table_data)
+                
+                row_data = {
+                    'Repository': repo_name,
+                    'Commit Hash': commit_hash[:12] + '...',
+                    'Full Hash': commit_hash,  # for tooltip
+                    'Author': commit_info.get('commit_author', 'Unknown'),
+                    'Email': commit_info.get('commit_email', 'Unknown'),
+                    'Date': commit_info.get('commit_date', 'Unknown'),
+                    'Summary': truncate_text(commit_info.get('commit_summary', ''), 80),
+                    'Message': truncate_text(commit_info.get('commit_message', ''), 150),
+                    'Changed Files': format_files_display(files_str, 15),  # show more files, numbered
+                    'Files Count': len(changed_files),
+                    'URL': commit_info.get('commit_url', ''),
+                    'AI Summary': format_ai_summary(commit_info.get('ai_summary', ''), 300),
+                    'Full AI Summary': commit_info.get('ai_summary', ''),  # store full summary for modal
+                    'Row Index': row_index
+                }
+                table_data.append(row_data)
+        
+        # create expandable JSON viewer component
+        json_content_section = dbc.Card([
+            dbc.CardHeader([
+                html.H5("📄 Raw JSON Data Browser", className="mb-0"),
+                html.Small(f"Total records: {len(table_data)}", className="text-muted")
+            ]),
+            dbc.CardBody([
+                # search and filter controls
+                dbc.Row([
+                    dbc.Col([
+                        dbc.InputGroup([
+                            dbc.InputGroupText("🔍"),
+                            dbc.Input(
+                                id="json-search-input",
+                                placeholder="Search in table data...",
+                                type="text"
+                            )
+                        ])
+                    ], width=6),
+                    dbc.Col([
+                        dbc.Select(
+                            id="json-repo-filter",
+                            options=[{"label": "All Repositories", "value": "all"}] + 
+                                   [{"label": repo, "value": repo} for repo in sorted(self.data.keys())],
+                            value="all"
+                        )
+                    ], width=3),
+                    dbc.Col([
+                        dbc.Button(
+                            "💾 Export CSV", 
+                            id="export-csv-btn",
+                            color="primary",
+                            size="sm"
+                        )
+                    ], width=3)
+                ], className="mb-3"),
+                
+                # main data table with horizontal scroll container
+                html.Div([
+                    dash_table.DataTable(
+                    id='json-data-table',
+                    data=table_data,
+                    columns=[
+                        {'name': 'Repository', 'id': 'Repository', 'type': 'text'},
+                        {'name': 'Commit', 'id': 'Commit Hash', 'type': 'text'},
+                        {'name': 'Author', 'id': 'Author', 'type': 'text'},
+                        {'name': 'Email', 'id': 'Email', 'type': 'text'},
+                        {'name': 'Date', 'id': 'Date', 'type': 'text'},
+                        {'name': 'Summary', 'id': 'Summary', 'type': 'text'},
+                        {'name': 'Message', 'id': 'Message', 'type': 'text'},
+                        {'name': 'Changed Files', 'id': 'Changed Files', 'type': 'text'},
+                        {'name': 'Files #', 'id': 'Files Count', 'type': 'numeric'},
+                        {'name': 'MR_LINK', 'id': 'URL', 'type': 'text', 'presentation': 'markdown'},
+                        {'name': 'AI Summary', 'id': 'AI Summary', 'type': 'text', 'presentation': 'markdown'}
+                    ],
+                    # styling
+                    style_cell={
+                        'textAlign': 'left',
+                        'padding': '8px 12px',
+                        'fontFamily': 'Arial, sans-serif',
+                        'fontSize': '11px',
+                        'whiteSpace': 'pre-wrap',
+                        'height': 'auto',
+                        'minWidth': '80px',
+                        'maxWidth': '300px',
+                        'overflow': 'auto'
+                    },
+                    style_header={
+                        'backgroundColor': 'rgb(50, 50, 50)',
+                        'color': 'white',
+                        'fontWeight': 'bold',
+                        'textAlign': 'center'
+                    },
+                    style_data={
+                        'backgroundColor': 'rgb(248, 249, 250)',
+                        'border': '1px solid rgb(220, 220, 220)'
+                    },
+                    style_data_conditional=[
+                        {
+                            'if': {'row_index': 'odd'},
+                            'backgroundColor': 'rgb(255, 255, 255)'
+                        },
+                        {
+                            'if': {'column_id': 'URL'},
+                            'color': 'blue',
+                            'textDecoration': 'underline'
+                        },
+                        {
+                            'if': {'column_id': 'AI Summary'},
+                            'backgroundColor': 'rgb(248, 251, 255)',
+                            'border': '1px solid rgb(220, 238, 255)',
+                            'borderRadius': '4px',
+                            'cursor': 'pointer'
+                        }
+                    ],
+                    # functionality
+                    page_size=20,
+                    sort_action="native",
+                    filter_action="native",
+                    row_selectable="multi",
+                    selected_rows=[],
+                    # responsive column widths with emphasis on AI Summary
+                    style_cell_conditional=[
+                        {'if': {'column_id': 'Repository'}, 'width': '8%', 'minWidth': '80px'},
+                        {'if': {'column_id': 'Commit Hash'}, 'width': '6%', 'minWidth': '70px'},
+                        {'if': {'column_id': 'Author'}, 'width': '8%', 'minWidth': '80px'},
+                        {'if': {'column_id': 'Email'}, 'width': '10%', 'minWidth': '120px'},
+                        {'if': {'column_id': 'Date'}, 'width': '8%', 'minWidth': '100px'},
+                        {'if': {'column_id': 'Summary'}, 'width': '12%', 'minWidth': '120px'},
+                        {'if': {'column_id': 'Message'}, 'width': '15%', 'minWidth': '150px'},
+                        {'if': {'column_id': 'Changed Files'}, 'width': '15%', 'minWidth': '200px', 
+                         'whiteSpace': 'pre-line', 'fontFamily': 'monospace', 'fontSize': '10px'},
+                        {'if': {'column_id': 'Files Count'}, 'width': '3%', 'minWidth': '50px', 'textAlign': 'center'},
+                        {'if': {'column_id': 'URL'}, 'width': '5%', 'minWidth': '60px'},
+                        {'if': {'column_id': 'AI Summary'}, 'width': '35%', 'minWidth': '450px', 
+                         'whiteSpace': 'pre-wrap', 'fontFamily': 'system-ui, -apple-system, sans-serif', 
+                         'lineHeight': '1.5', 'fontSize': '12px', 'padding': '12px'}
+                    ],
+                    # tooltip data for full content
+                    tooltip_data=[
+                        {
+                            'Commit Hash': {'value': row['Full Hash'], 'type': 'text'},
+                            'Summary': {'value': row['Summary'], 'type': 'markdown'},
+                            'Message': {'value': row['Message'], 'type': 'markdown'},
+                            'Changed Files': {'value': row['Changed Files'], 'type': 'markdown'},
+                            'AI Summary': {'value': 'Click to view detailed AI analysis in modal', 'type': 'text'}
+                        } for row in table_data
+                    ],
+                    tooltip_duration=None
+                )], style={'overflowX': 'auto', 'width': '100%'}),
+                
+                # summary statistics
+                html.Hr(),
+                dbc.Row([
+                    dbc.Col([
+                        html.H6("📊 Quick Stats"),
+                        html.P([
+                            f"Total Commits: {len(table_data)}", html.Br(),
+                            f"Repositories: {len(set(row['Repository'] for row in table_data))}", html.Br(),
+                            f"Authors: {len(set(row['Author'] for row in table_data))}", html.Br(),
+                            f"Total Files Changed: {sum(row['Files Count'] for row in table_data)}"
+                        ])
+                    ], width=4),
+                    dbc.Col([
+                        html.H6("💡 Tips"),
+                        html.P([
+                            "• Click column headers to sort", html.Br(),
+                            "• Use the filter boxes under headers", html.Br(),
+                            "• Hover over cells to see full content", html.Br(),
+                            "• Click on AI Summary for detailed analysis", html.Br(),
+                            "• Select rows and export data"
+                        ])
+                    ], width=8)
+                ])
+            ])
+        ])
+        
+        # add modal for detailed AI summary view
+        modal = dbc.Modal([
+            dbc.ModalHeader(dbc.ModalTitle("🤖 AI Analysis Details", id="modal-title")),
+            dbc.ModalBody([
+                dcc.Markdown(id="modal-content", style={'lineHeight': '1.6'})
+            ], style={'maxHeight': '70vh', 'overflowY': 'auto'}),
+            dbc.ModalFooter(
+                dbc.Button("Close", id="close-modal", className="ms-auto", n_clicks=0)
+            ),
+        ], id="detail-modal", is_open=False, size="xl", scrollable=True)
+        
+        return html.Div([json_content_section, modal])
+    
     def _create_author_chart(self, commits_df):
         """Create commits by author chart"""
         author_counts = commits_df['author'].value_counts().head(10)
@@ -553,8 +895,29 @@ class CodetDashboard:
     
     def _create_timeline_chart(self, commits_df):
         """Create commit timeline chart"""
+        if commits_df.empty:
+            # return empty chart if no data
+            fig = px.line(title="Daily Commit Activity - No Data Available")
+            fig.update_layout(height=400)
+            return fig
+        
+        # ensure date column is datetime
+        commits_df_copy = commits_df.copy()
+        if not pd.api.types.is_datetime64_any_dtype(commits_df_copy['date']):
+            # convert to datetime if not already
+            commits_df_copy['date'] = pd.to_datetime(commits_df_copy['date'], errors='coerce')
+        
+        # remove any invalid dates
+        commits_df_copy = commits_df_copy.dropna(subset=['date'])
+        
+        if commits_df_copy.empty:
+            # return empty chart if no valid dates
+            fig = px.line(title="Daily Commit Activity - No Valid Dates")
+            fig.update_layout(height=400)
+            return fig
+        
         # group by date for daily commit counts
-        daily_commits = commits_df.groupby(commits_df['date'].dt.date).size().reset_index()
+        daily_commits = commits_df_copy.groupby(commits_df_copy['date'].dt.date).size().reset_index()
         daily_commits.columns = ['date', 'commits']
         
         fig = px.line(
