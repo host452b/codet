@@ -390,10 +390,19 @@ class CodeTrailExecutor:
         endpoint = self.args.openai_endpoint
         llm_model = self.args.model
         custom_prompt = self.args.custom_prompt
+        input_file = self.args.input_file
 
         if custom_prompt:
-            print(f"CUSTOM PROMPT MESSAGE IS:\n\t: {custom_prompt}")
+            print(f"===> CUSTOM PROMPT MESSAGE IS:\n\t: {custom_prompt}")
             text_input += custom_prompt
+        
+        if input_file:
+            print(f"===> READING INPUT FILE:\n\t{input_file}")
+            with open(input_file, 'r') as file:
+                text_input += "Please analyze the additional file attachments together with the provided materials. \n"
+                text_input += "File attachments as follows: \n"
+                text_input += file.read()
+                text_input += "\n"
 
         if not (api_token and endpoint and llm_model):
             self.logger.warning(">>-------> No API token or endpoint or model provided, skipping AI analysis <-------<< ")

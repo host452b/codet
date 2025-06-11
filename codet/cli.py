@@ -196,6 +196,13 @@ def main():
         default=None,
         help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} Specify a custom prompt message for the user (default: empty)"
     )
+    parser.add_argument(
+        "-f",
+        "--input-file",
+        type=argparse.FileType("r"),
+        default=None,
+        help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} Input file to read and AI analyze with prompt (default: None)"
+    )
     # check environment variable and override argument default if present
     api_token_env = os.getenv("AI_API_TOKEN")
     if api_token_env is not None:
