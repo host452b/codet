@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="codet",
-    version="1.0.2",
+    version="1.0.3",
     author="clemente0620",
     author_email="clemente0620@gmail.com",
     description="A cross-platform command-line tool for file processing and Git repository analysis with support for commit history tracking, code hotspot detection, and customizable filtering options",
@@ -33,6 +33,10 @@ setup(
         "prettytable>=3.12.0",
         "tqdm>=4.60.0",
         "openai>=1.84.0",
+        "dash>=2.14.0",
+        "plotly>=5.15.0",
+        "pandas",
+        "dash-bootstrap-components",
     ],
     entry_points={
         "console_scripts": [
