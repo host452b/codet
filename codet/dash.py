@@ -961,7 +961,7 @@ Feel free to examine the commit details in the main table for more context."""
                         }
                     ],
                     # functionality
-                    page_size=10,
+                    page_size=100,
                     sort_action="native",
                     filter_action="native",
                     row_selectable="multi",
