@@ -647,11 +647,14 @@ class CodeTrailExecutor:
                     date_str = datetime.now().strftime("%Y%m%d")
                     
                 # create output directory if not exists
-                output_dir = f"cook_{repo_name}_json"
+                output_dir = f"json_cook"
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
+                repo_dir = os.path.join(output_dir, repo_name)
+                if not os.path.exists(repo_dir):
+                    os.makedirs(repo_dir)
                     
-                output_filename = os.path.join(output_dir, f"{repo_name}_{date_str}_{commit_hash}_cook.json")
+                output_filename = os.path.join(repo_dir, f"{repo_name}_{date_str}_{commit_hash}_cook.json")
                 
                 self.logger.info(f"Saving JSON report to '{output_filename}'")
                 with open(output_filename, 'w', encoding='utf-8') as f:
