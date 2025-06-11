@@ -436,7 +436,7 @@ class CodeTrailExecutor:
         for chunk in chat_completion:
             if chunk.choices and chunk.choices[0].delta.content:
                 full_reply += chunk.choices[0].delta.content
-        print("=========================================== ????????????????? ")
+        print("=========================================== ")
         print(full_reply)
         return full_reply
 
