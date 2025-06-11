@@ -580,7 +580,7 @@ class CodeTrailExecutor:
         write_thread.start()
 
         # Process commits in parallel
-        with ThreadPoolExecutor(max_workers=50) as executor:
+        with ThreadPoolExecutor(max_workers=24) as executor:
             futures = []
             
             for repo_name, commits in self.cooked_commits.items():
@@ -683,7 +683,7 @@ class CodeTrailExecutor:
             return commit_hash, final_commit_data
 
         # Process commits in parallel using ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=50) as executor:
+        with ThreadPoolExecutor(max_workers=24) as executor:
             futures = []
             
             for repo_name, commits in self.cooked_commits.items():
