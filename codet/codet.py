@@ -1,6 +1,8 @@
 import os
 import sys
 import datetime 
+import re
+import json
 from typing import List, Dict, Any, Optional
 from codet.git_compoent import GitAnalyzer
 from collections import OrderedDict
@@ -584,3 +586,75 @@ class CodeTrailExecutor:
         self.logger.info(f"Git patch/diff report generated: {output_file}")
         self.logger.info(f"\033[1;33m\033[1mFile path: {os.path.abspath(output_file)}\033[0m")
         self.logger.info(f"This report can be opened directly in Cursor for code change analysis or integrated with various LLM Agent tools")
+
+    def generate_cook_json(self):
+        """Generates a JSON report for each repository with detailed commit info and AI-extracted keywords."""
+        if not self.args.output_cook_json: 
+            self.logger.info("JSON report generation skipped. Use -oj or --output-cook-json flag to enable.")
+            return
+
+        if not hasattr(self, 'cooked_commits') or not self.cooked_commits:
+            self.logger.warning("No processed commits available for JSON report generation.")
+            return
+
+        self.logger.info("Generating JSON reports for cooked commits...")
+
+        for repo_name, commits in self.cooked_commits.items():
+            if not commits:
+                continue
+
+            self.logger.info(f"Processing repository: {repo_name}")
+            all_commits_data = OrderedDict()
+
+            for commit_hash, commit_data in commits.items():
+                ai_text = (
+                    f"{commit_data.get('commit_summary', '')}\n"
+                    f"{commit_data.get('commit_message', '')}\n"
+                    f"{commit_data.get('commit_diff_text', '')}"
+                )
+    
+                if ai_text.strip():
+                    try:
+                        ai_output = self.ai_analysis(ai_text)
+                    except Exception as e:
+                        self.logger.warning("AI analysis failed in func generate_cook_json for repository {0}: {1}".format(repo_name, e))
+                        ai_output = None
+
+                # convert datetime to string if present
+                commit_date = commit_data.get("commit_date")
+                print(f"commit_date: {commit_date}, {type(commit_date)}")
+                if commit_date and hasattr(commit_date, 'isoformat'):
+                    commit_date = commit_date.isoformat()
+
+                final_commit_data = {
+                    "commit_email": commit_data.get("commit_email"),
+                    "commit_author": commit_data.get("commit_author"),
+                    "commit_summary": commit_data.get("commit_summary"),
+                    "commit_message": commit_data.get("commit_message") or commit_data.get("commit_diff_text"),
+                    "commit_date": commit_date,
+                    "commit_url": commit_data.get("commit_url"),
+                    "commit_changed_files": commit_data.get("commit_changed_files"),
+                    "ai_summary": ai_output
+                }
+    
+                all_commits_data[commit_hash] = final_commit_data
+
+                # use current date if no commit date available
+                date_str = commit_data.get("commit_date")
+                if date_str and hasattr(date_str, 'strftime'):
+                    date_str = date_str.strftime("%Y%m%d")
+                elif not date_str:
+                    date_str = datetime.now().strftime("%Y%m%d")
+                    
+                # create output directory if not exists
+                output_dir = f"cook_{repo_name}_json"
+                if not os.path.exists(output_dir):
+                    os.makedirs(output_dir)
+                    
+                output_filename = os.path.join(output_dir, f"{repo_name}_{date_str}_{commit_hash}_cook.json")
+                
+                self.logger.info(f"Saving JSON report to '{output_filename}'")
+                with open(output_filename, 'w', encoding='utf-8') as f:
+                    json.dump(all_commits_data, f, indent=4)
+        
+        self.logger.info("JSON report generation complete.")

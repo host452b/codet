@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="codet",
-    version="1.0.1",
+    version="1.0.2",
     author="clemente0620",
     author_email="clemente0620@gmail.com",
     description="A cross-platform command-line tool for file processing and Git repository analysis with support for commit history tracking, code hotspot detection, and customizable filtering options",
@@ -37,6 +37,7 @@ setup(
     entry_points={
         "console_scripts": [
             "codet=codet.cli:main",
+            "codet-dash=codet.dash:main",
         ],
     },
     extras_require={

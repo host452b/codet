@@ -203,6 +203,13 @@ def main():
         default=None,
         help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} Input file to read and AI analyze with prompt (default: None)"
     )
+    parser.add_argument(
+        "-oj",
+        "--output-cook-json",
+        action="store_true",
+        default=False,
+        help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} generate dir repo_name_cook for cook.json file (default: None)"
+    )
     # check environment variable and override argument default if present
     api_token_env = os.getenv("AI_API_TOKEN")
     if api_token_env is not None:
@@ -222,6 +229,7 @@ def main():
     executor.cook()
     executor.hotspot()
     executor.generate_report()
+    executor.generate_cook_json()
 
 
 if __name__ == "__main__":
