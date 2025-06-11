@@ -1,12 +1,15 @@
 import os
 import sys
-import datetime 
 import re
 import json
+import datetime
 from typing import List, Dict, Any, Optional
 from codet.git_compoent import GitAnalyzer
 from collections import OrderedDict
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from queue import Queue
+import threading
 
 class CodeTrailExecutor:
     """Code trail executor for analyzing Git commit history"""
@@ -452,8 +455,7 @@ class CodeTrailExecutor:
         This method creates a text file containing aggregated git patches from analyzed commits,
         including contextual information and the actual diff content.
         """
-        import os
-        from datetime import datetime
+
         
         if not hasattr(self, 'cooked_commits') or not self.cooked_commits:
             self.logger.warning("No processed commits available for report generation")
@@ -462,128 +464,152 @@ class CodeTrailExecutor:
         self.logger.info("Generating git patch/diff report file...")
         
         # Generate timestamp for the filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = os.path.join(os.getcwd(), f"git_patch_report_{timestamp}.diff")
         
-        with open(output_file, 'w', encoding='utf-8') as f:
-            # write report header: general info for the whole report
-            f.write("# Git Patch/Diff Report\n")
-            f.write("# Generated: {0}\n\n".format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        # Create a thread-safe queue for writing to file
+        write_queue = Queue()
+        
+        def process_commit(repo_name, commit_hash, commit_data):
+            """Process a single commit and return the formatted text"""
+            pre_prompt = (
+                "\n"
+                "As an expert in the current {0} project, you need analyze the Git commit message and diff info related to '{1}' feature. Answer these questions:\n"
+                "1. What are the main changes in this commit for {0}.\n"
+                "2. What problems might these changes solve for {0}.\n"
+                "3. Extract key info from the commit message and explain how it describes the code submission for {0}.\n"
+                "4. Analyze the relationship between the submitted code and its description. Point out which code implements the goals in the commit message for {0}.\n"
+                "5. Evaluate the impact of this commit on the project. Which files or functionalities are affected for {0}.\n"
+                "6. Explain the context and significance of this commit. Does it address issues or implement new features for {0}.\n"
+                "7. If there are changes involving \"tests/trt-test-defs/\", please briefly mention the impact of these changes for {0}.\n"
+                "8. Don't explaining abbreviations.\n"
+                "\n"
+                "the output should not include the above rules and requirements; it should be naturally integrated.\n"
+            ).format(
+                repo_name,
+                self.args.keyword if hasattr(self, 'args') and hasattr(self.args, 'keyword') else ""
+            )
+
+            ai_input_text = (
+                "Repository: {0}\n"
+                "Commit: {1}\n"
+                "Author: {2} <{3}>\n"
+                "Date: {4}\n"
+                "Commit Message:\n{5}\n"
+                "{6}\n"
+            ).format(
+                repo_name,
+                commit_hash,
+                commit_data.get('commit_author', 'Unknown'),
+                commit_data.get('commit_email', 'Unknown'),
+                commit_data.get('commit_date', 'Unknown'),
+                commit_data.get('commit_message', 'No message'),
+                pre_prompt
+            )
+
+            if 'commit_changed_files' in commit_data and commit_data['commit_changed_files']:
+                ai_input_text += "Changed Files:\n"
+                for file_path in commit_data['commit_changed_files']:
+                    ai_input_text += "  - {0}\n".format(file_path)
+            if 'commit_diff_text' in commit_data and commit_data['commit_diff_text']:
+                ai_input_text += "Git Patch/Diff:\n"
+                ai_input_text += commit_data['commit_diff_text'] + "\n"
+            if 'commit_url' in commit_data and commit_data['commit_url']:
+                ai_input_text += "Commit URL: {0}\n".format(commit_data['commit_url'])
+            ai_input_text += "\n"
+
+            # Get AI analysis
+            ai_output = None
+            if ai_input_text.strip():
+                try:
+                    ai_output = self.ai_analysis(ai_input_text)
+                except Exception as e:
+                    self.logger.warning(f"AI analysis failed for repository {repo_name}: {e}")
+                    ai_output = None
+
+            # Format the output text
+            output_text = []
+            output_text.append("-------------------------------------------------------------------------------")
+            output_text.append(f"Commit: {commit_hash}")
+            output_text.append(f"Author: {commit_data.get('commit_author', 'Unknown')} <{commit_data.get('commit_email', 'Unknown')}>")
+            output_text.append(f"Date: {commit_data.get('commit_date', 'Unknown')}\n")
+            output_text.append("Commit Message:")
+            output_text.append(f"{commit_data.get('commit_message', 'No message')}\n")
+            output_text.append("# --------- Analysis Context (for AI) ---------")
+            output_text.append(pre_prompt + "\n")
+
+            if 'commit_changed_files' in commit_data and commit_data['commit_changed_files']:
+                output_text.append("# --------- Changed Files ---------")
+                for file_path in commit_data['commit_changed_files']:
+                    output_text.append(f"  - {file_path}")
+                output_text.append("")
+
+            if 'commit_diff_text' in commit_data and commit_data['commit_diff_text']:
+                output_text.append("# --------- Git Patch/Diff ---------")
+                output_text.append(commit_data['commit_diff_text'] + "\n")
+            else:
+                output_text.append("# --------- No diff information available for this commit ---------\n")
+
+            if 'commit_url' in commit_data and commit_data['commit_url']:
+                output_text.append("# --------- Commit URL ---------")
+                output_text.append(f"{commit_data['commit_url']}\n")
+
+            if ai_output:
+                output_text.append("===============================================================================")
+                output_text.append("# ===================== AI Analysis Output (LLM Generated) =====================")
+                output_text.append(ai_output + "\n")
+
+            return "\n".join(output_text)
+
+        def write_worker():
+            """Worker thread for writing to file"""
+            with open(output_file, 'w', encoding='utf-8') as f:
+                # Write header
+                f.write("# Git Patch/Diff Report\n")
+                f.write(f"# Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                
+                while True:
+                    item = write_queue.get()
+                    if item is None:
+                        break
+                    f.write(item)
+                    write_queue.task_done()
+
+        # Start the write worker thread
+        write_thread = threading.Thread(target=write_worker)
+        write_thread.start()
+
+        # Process commits in parallel
+        with ThreadPoolExecutor(max_workers=50) as executor:
+            futures = []
             
-            # iterate over each repository and its commits
             for repo_name, commits in self.cooked_commits.items():
                 if not commits:
                     continue
 
-                # section header for each repository
-                f.write("===============================================================================\n")
-                f.write("Repository: {0}\n".format(repo_name))
-                f.write("===============================================================================\n\n")
+                # Write repository header
+                write_queue.put(
+                    "===============================================================================\n"
+                    f"Repository: {repo_name}\n"
+                    "===============================================================================\n\n"
+                )
 
-                ai_input_text = ""
-                # process each commit in the current repository
-                for commit_hash, commit_data in tqdm(commits.items(), desc="Generate a comprehensive git patch/diff report file based on analyzed commits"):
-                    # section for each commit's raw data
-                    f.write("-------------------------------------------------------------------------------\n")
-                    f.write("Commit: {0}\n".format(commit_hash))
-                    f.write("Author: {0} <{1}>\n".format(
-                        commit_data.get('commit_author', 'Unknown'),
-                        commit_data.get('commit_email', 'Unknown')
-                    ))
-                    f.write("Date: {0}\n\n".format(commit_data.get('commit_date', 'Unknown')))
-                    
-                    # write commit message section
-                    f.write("Commit Message:\n")
-                    f.write("{0}\n\n".format(commit_data.get('commit_message', 'No message')))
-                    
-                    # write analysis context prompt for AI (for transparency)
-                    # this is the prompt that will be used for AI analysis
-                    pre_prompt = (
-                        "\n"
-                        "As an expert in the current {0} project, you need analyze the Git commit message and diff info related to '{1}' feature. Answer these questions:\n"
-                        "1. What are the main changes in this commit for {0}.\n"
-                        "2. What problems might these changes solve for {0}.\n"
-                        "3. Extract key info from the commit message and explain how it describes the code submission for {0}.\n"
-                        "4. Analyze the relationship between the submitted code and its description. Point out which code implements the goals in the commit message for {0}.\n"
-                        "5. Evaluate the impact of this commit on the project. Which files or functionalities are affected for {0}.\n"
-                        "6. Explain the context and significance of this commit. Does it address issues or implement new features for {0}.\n"
-                        "7. If there are changes involving \"tests/trt-test-defs/\", please briefly mention the impact of these changes for {0}.\n"
-                        "8. Don't explaining abbreviations.\n"
-                        "\n"
-                        "the output should not include the above rules and requirements; it should be naturally integrated.\n"
-                    ).format(
-                        repo_name,
-                        self.args.keyword if hasattr(self, 'args') and hasattr(self.args, 'keyword') else ""
-                    )
-                    
-                    # clearly mark the start of the analysis context for this commit
-                    f.write("# --------- Analysis Context (for AI) ---------\n")
-                    f.write(pre_prompt)
-                    f.write("\n\n")
-                    
-                    # write changed files section if available
-                    if 'commit_changed_files' in commit_data and commit_data['commit_changed_files']:
-                        f.write("# --------- Changed Files ---------\n")
-                        for file_path in commit_data['commit_changed_files']:
-                            f.write("  - {0}\n".format(file_path))
-                        f.write("\n")
-                    
-                    # write git diff/patch section if available
-                    if 'commit_diff_text' in commit_data and commit_data['commit_diff_text']:
-                        f.write("# --------- Git Patch/Diff ---------\n")
-                        f.write(commit_data['commit_diff_text'])
-                        f.write("\n\n")
-                    else:
-                        f.write("# --------- No diff information available for this commit ---------\n\n")
-                    
-                    # write commit URL if available
-                    if 'commit_url' in commit_data and commit_data['commit_url']:
-                        f.write("# --------- Commit URL ---------\n")
-                        f.write("{0}\n\n".format(commit_data['commit_url']))
+                # Submit commit processing tasks
+                for commit_hash, commit_data in commits.items():
+                    future = executor.submit(process_commit, repo_name, commit_hash, commit_data)
+                    futures.append(future)
 
-                    # accumulate text for AI analysis (for this repository)
-                    ai_input_text += (
-                        "Repository: {0}\n"
-                        "Commit: {1}\n"
-                        "Author: {2} <{3}>\n"
-                        "Date: {4}\n"
-                        "Commit Message:\n{5}\n"
-                        "{6}\n"
-                    ).format(
-                        repo_name,
-                        commit_hash,
-                        commit_data.get('commit_author', 'Unknown'),
-                        commit_data.get('commit_email', 'Unknown'),
-                        commit_data.get('commit_date', 'Unknown'),
-                        commit_data.get('commit_message', 'No message'),
-                        pre_prompt
-                    )
-                    if 'commit_changed_files' in commit_data and commit_data['commit_changed_files']:
-                        ai_input_text += "Changed Files:\n"
-                        for file_path in commit_data['commit_changed_files']:
-                            ai_input_text += "  - {0}\n".format(file_path)
-                    if 'commit_diff_text' in commit_data and commit_data['commit_diff_text']:
-                        ai_input_text += "Git Patch/Diff:\n"
-                        ai_input_text += commit_data['commit_diff_text'] + "\n"
-                    if 'commit_url' in commit_data and commit_data['commit_url']:
-                        ai_input_text += "Commit URL: {0}\n".format(commit_data['commit_url'])
-                    ai_input_text += "\n"
+            # Process results as they complete
+            for future in tqdm(as_completed(futures), total=len(futures), desc="Processing commits"):
+                try:
+                    result = future.result()
+                    write_queue.put(result)
+                except Exception as e:
+                    self.logger.error(f"Error processing commit: {e}")
 
-                    # call ai_analysis for this repository if there is any input
-                    ai_output = None
-                    if ai_input_text.strip():
-                        try:
-                            ai_output = self.ai_analysis(ai_input_text)
-                        except Exception as e:
-                            self.logger.warning("AI analysis failed for repository {0}: {1}".format(repo_name, e))
-                            ai_output = None
-
-                    # write AI analysis output section, clearly separated from raw data
-                    if ai_output:
-                        f.write("===============================================================================\n")
-                        f.write("# ===================== AI Analysis Output (LLM Generated) =====================\n")
-                        f.write(ai_output)
-                        f.write("\n")
+        # Signal the write worker to finish
+        write_queue.put(None)
+        write_thread.join()
             
         self.logger.info(f"Git patch/diff report generated: {output_file}")
         self.logger.info(f"\033[1;33m\033[1mFile path: {os.path.abspath(output_file)}\033[0m")
@@ -601,65 +627,81 @@ class CodeTrailExecutor:
 
         self.logger.info("Generating JSON reports for cooked commits...")
 
-        for repo_name, commits in tqdm(self.cooked_commits.items(), desc="Processing and cooking generate_cook_json"):
-            if not commits:
-                continue
+        # create output directory if not exists
+        output_dir = "json_cook"
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
 
-            self.logger.info(f"Processing repository: {repo_name}")
-            all_commits_data = OrderedDict()
+        def process_commit(repo_name, commit_hash, commit_data):
+            """Process a single commit and return the formatted data"""
+            ai_text = (
+                f"{commit_data.get('commit_summary', '')}\n"
+                f"{commit_data.get('commit_message', '')}\n"
+                f"{commit_data.get('commit_diff_text', '')}"
+            )
 
-            for commit_hash, commit_data in commits.items():
-                ai_text = (
-                    f"{commit_data.get('commit_summary', '')}\n"
-                    f"{commit_data.get('commit_message', '')}\n"
-                    f"{commit_data.get('commit_diff_text', '')}"
-                )
-    
-                if ai_text.strip():
-                    try:
-                        ai_output = self.ai_analysis(ai_text)
-                    except Exception as e:
-                        self.logger.warning("AI analysis failed in func generate_cook_json for repository {0}: {1}".format(repo_name, e))
-                        ai_output = None
+            ai_output = None
+            if ai_text.strip():
+                try:
+                    ai_output = self.ai_analysis(ai_text)
+                except Exception as e:
+                    self.logger.warning(f"AI analysis failed for {repo_name}: {e}")
 
-                # convert datetime to string if present
-                commit_date = commit_data.get("commit_date")
-                print(f"commit_date: {commit_date}, {type(commit_date)}")
-                if commit_date and hasattr(commit_date, 'isoformat'):
-                    commit_date = commit_date.isoformat()
+            # convert datetime to string if present
+            commit_date = commit_data.get("commit_date")
+            if commit_date and hasattr(commit_date, 'isoformat'):
+                commit_date = commit_date.isoformat()
 
-                final_commit_data = {
-                    "commit_email": commit_data.get("commit_email"),
-                    "commit_author": commit_data.get("commit_author"),
-                    "commit_summary": commit_data.get("commit_summary"),
-                    "commit_message": commit_data.get("commit_message") or commit_data.get("commit_diff_text"),
-                    "commit_date": commit_date,
-                    "commit_url": commit_data.get("commit_url"),
-                    "commit_changed_files": commit_data.get("commit_changed_files"),
-                    "ai_summary": ai_output
-                }
-    
-                all_commits_data[commit_hash] = final_commit_data
+            final_commit_data = {
+                "commit_email": commit_data.get("commit_email"),
+                "commit_author": commit_data.get("commit_author"),
+                "commit_summary": commit_data.get("commit_summary"),
+                "commit_message": commit_data.get("commit_message") or commit_data.get("commit_diff_text"),
+                "commit_date": commit_date,
+                "commit_url": commit_data.get("commit_url"),
+                "commit_changed_files": commit_data.get("commit_changed_files"),
+                "ai_summary": ai_output
+            }
 
-                # use current date if no commit date available
-                date_str = commit_data.get("commit_date")
-                if date_str and hasattr(date_str, 'strftime'):
-                    date_str = date_str.strftime("%Y%m%d")
-                elif not date_str:
-                    date_str = datetime.now().strftime("%Y%m%d")
-                    
-                # create output directory if not exists
-                output_dir = f"json_cook"
-                if not os.path.exists(output_dir):
-                    os.makedirs(output_dir)
-                repo_dir = os.path.join(output_dir, repo_name)
-                if not os.path.exists(repo_dir):
-                    os.makedirs(repo_dir)
-                    
-                output_filename = os.path.join(repo_dir, f"{repo_name}_{date_str}_{commit_hash}_cook.json")
+            # use current date if no commit date available
+            date_str = commit_data.get("commit_date")
+            if date_str and hasattr(date_str, 'strftime'):
+                date_str = date_str.strftime("%Y%m%d")
+            elif not date_str:
+                date_str = datetime.datetime.now().strftime("%Y%m%d")
+
+            repo_dir = os.path.join(output_dir, repo_name)
+            if not os.path.exists(repo_dir):
+                os.makedirs(repo_dir)
+
+            output_filename = os.path.join(repo_dir, f"{repo_name}_{date_str}_{commit_hash}_cook.json")
+            
+            self.logger.info(f"Saving JSON report to '{output_filename}'")
+            with open(output_filename, 'w', encoding='utf-8') as f:
+                json.dump({commit_hash: final_commit_data}, f, indent=4)
+
+            return commit_hash, final_commit_data
+
+        # Process commits in parallel using ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=50) as executor:
+            futures = []
+            
+            for repo_name, commits in self.cooked_commits.items():
+                if not commits:
+                    continue
+
+                self.logger.info(f"Processing repository: {repo_name}")
                 
-                self.logger.info(f"Saving JSON report to '{output_filename}'")
-                with open(output_filename, 'w', encoding='utf-8') as f:
-                    json.dump(all_commits_data, f, indent=4)
-        
+                # Submit commit processing tasks
+                for commit_hash, commit_data in commits.items():
+                    future = executor.submit(process_commit, repo_name, commit_hash, commit_data)
+                    futures.append(future)
+
+            # Process results as they complete
+            for future in tqdm(as_completed(futures), total=len(futures), desc="Processing commits"):
+                try:
+                    future.result()
+                except Exception as e:
+                    self.logger.error(f"Error processing commit: {e}")
+
         self.logger.info("JSON report generation complete.")

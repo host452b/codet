@@ -394,11 +394,19 @@ class CodetDashboard:
         # tab content
         tab_content = html.Div(id="tab-content", className="mt-3")
         
+        # add interval for periodic data refresh
+        interval = dcc.Interval(
+            id='interval-component',
+            interval=60*1000,  # in milliseconds (60 seconds)
+            n_intervals=0
+        )
+        
         return dbc.Container([
             header,
             filters_row,
             tabs,
-            tab_content
+            tab_content,
+            interval
         ], fluid=True)
     
     def _register_callbacks(self):
@@ -411,11 +419,16 @@ class CodetDashboard:
              Input('date-range-picker', 'end_date'),
              Input('author-dropdown', 'value'),
              Input('repo-dropdown', 'value'),
-             Input('filetype-dropdown', 'value')]
+             Input('filetype-dropdown', 'value'),
+             Input('interval-component', 'n_intervals')]
         )
         def update_tab_content(active_tab, start_date, end_date, selected_authors, 
-                             selected_repos, selected_filetypes):
+                             selected_repos, selected_filetypes, n_intervals):
             try:
+                # reload data on interval
+                if n_intervals > 0:
+                    self.load_data()
+                
                 # ensure selected values are not None
                 if selected_authors is None:
                     selected_authors = list(self.df_commits['author'].unique()) if not self.df_commits.empty else []
