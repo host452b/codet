@@ -273,27 +273,217 @@ class CodetDashboard:
                         transition: all 0.2s ease-in-out;
                     }
                     
+                    /* Page fade-in animation */
+                    body {
+                        animation: fadeInBody 0.8s ease-in-out;
+                        opacity: 1;
+                    }
+                    
+                    @keyframes fadeInBody {
+                        0% { 
+                            opacity: 0; 
+                            transform: translateY(20px);
+                        }
+                        100% { 
+                            opacity: 1; 
+                            transform: translateY(0);
+                        }
+                    }
+                    
+                    /* Component fade-in animations */
+                    .card, .dash-table-container, .tab-content {
+                        animation: slideInUp 0.6s ease-out;
+                        animation-fill-mode: both;
+                    }
+                    
+                    @keyframes slideInUp {
+                        0% {
+                            opacity: 0;
+                            transform: translateY(30px);
+                        }
+                        100% {
+                            opacity: 1;
+                            transform: translateY(0);
+                        }
+                    }
+                    
+                    /* Staggered animation for cards */
+                    .card:nth-child(1) { animation-delay: 0.1s; }
+                    .card:nth-child(2) { animation-delay: 0.2s; }
+                    .card:nth-child(3) { animation-delay: 0.3s; }
+                    .card:nth-child(4) { animation-delay: 0.4s; }
+                    
+                    /* Loading skeleton animation */
+                    .skeleton {
+                        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+                        background-size: 200% 100%;
+                        animation: skeleton-loading 1.5s infinite;
+                        border-radius: 4px;
+                    }
+                    
+                    @keyframes skeleton-loading {
+                        0% { background-position: 200% 0; }
+                        100% { background-position: -200% 0; }
+                    }
+                    
+                    /* Enhanced loading spinner */
+                    .loading-container {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 200px;
+                        animation: fadeIn 0.5s ease-in-out;
+                    }
+                    
+                    .custom-spinner {
+                        width: 50px;
+                        height: 50px;
+                        border: 4px solid #f3f3f3;
+                        border-top: 4px solid #76B900;
+                        border-radius: 50%;
+                        animation: spin 1s linear infinite;
+                        margin-bottom: 20px;
+                    }
+                    
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                    
+                    /* Progress bar animation */
+                    .progress-bar {
+                        width: 100%;
+                        height: 4px;
+                        background-color: #f0f0f0;
+                        border-radius: 2px;
+                        overflow: hidden;
+                        margin: 20px 0;
+                    }
+                    
+                    .progress-fill {
+                        height: 100%;
+                        background: linear-gradient(90deg, #76B900, #5a8c00);
+                        border-radius: 2px;
+                        animation: progress 2s ease-in-out infinite;
+                    }
+                    
+                    @keyframes progress {
+                        0% { 
+                            width: 0%; 
+                            transform: scaleX(0);
+                            transform-origin: left;
+                        }
+                        50% { 
+                            width: 100%; 
+                            transform: scaleX(1);
+                        }
+                        100% { 
+                            width: 100%; 
+                            transform: scaleX(0);
+                            transform-origin: right;
+                        }
+                    }
+                    
                     /* Enhanced button hover effects */
                     button:hover {
                         transform: translateY(-1px);
                         box-shadow: 0 4px 12px rgba(118, 185, 0, 0.15) !important;
                     }
                     
-                    /* Card hover effects */
-                    .card:hover {
-                        transform: translateY(-2px);
-                        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1) !important;
+                    /* Card hover effects with enhanced animation */
+                    .card {
+                        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     }
                     
-                    /* Smooth badge animations */
-                    .badge {
+                    .card:hover {
+                        transform: translateY(-4px);
+                        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12) !important;
+                    }
+                    
+                    /* Shadow hover utility class */
+                    .shadow-hover {
                         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    }
+                    
+                    .shadow-hover:hover {
+                        transform: translateY(-6px) scale(1.02);
+                        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15) !important;
+                    }
+                    
+                    /* Animated counter effect */
+                    .animated-counter {
+                        animation: countUp 1.5s ease-out, glow 2s ease-in-out infinite alternate;
+                    }
+                    
+                    @keyframes countUp {
+                        0% { 
+                            transform: scale(0.8); 
+                            opacity: 0; 
+                        }
+                        50% { 
+                            transform: scale(1.1); 
+                            opacity: 0.8; 
+                        }
+                        100% { 
+                            transform: scale(1); 
+                            opacity: 1; 
+                        }
+                    }
+                    
+                    @keyframes glow {
+                        0% { 
+                            text-shadow: 0 0 5px rgba(118, 185, 0, 0.3); 
+                        }
+                        100% { 
+                            text-shadow: 0 0 20px rgba(118, 185, 0, 0.6), 0 0 30px rgba(118, 185, 0, 0.4); 
+                        }
+                    }
+                    
+                    /* Icon bounce animation */
+                    .fas, .fab {
+                        transition: all 0.3s ease-in-out;
+                    }
+                    
+                    .card:hover .fas,
+                    .card:hover .fab {
+                        transform: scale(1.2) rotate(5deg);
+                        animation: iconPulse 0.6s ease-in-out;
+                    }
+                    
+                    @keyframes iconPulse {
+                        0%, 100% { transform: scale(1.2) rotate(5deg); }
+                        50% { transform: scale(1.4) rotate(-5deg); }
                     }
                     
                     /* Input focus effects */
                     .form-control:focus, .form-select:focus {
                         border-color: #76B900 !important;
                         box-shadow: 0 0 0 0.2rem rgba(118, 185, 0, 0.25) !important;
+                        transform: scale(1.02);
+                        transition: all 0.3s ease-in-out;
+                    }
+                    
+                    /* Tab transition effects */
+                    .nav-tabs .nav-link {
+                        transition: all 0.3s ease-in-out;
+                        position: relative;
+                        overflow: hidden;
+                    }
+                    
+                    .nav-tabs .nav-link::before {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: -100%;
+                        width: 100%;
+                        height: 100%;
+                        background: linear-gradient(90deg, transparent, rgba(118, 185, 0, 0.1), transparent);
+                        transition: left 0.5s;
+                    }
+                    
+                    .nav-tabs .nav-link:hover::before {
+                        left: 100%;
                     }
                     
                     /* Smooth scrollbar */
@@ -308,26 +498,215 @@ class CodetDashboard:
                     ::-webkit-scrollbar-thumb {
                         background: #76B900;
                         border-radius: 4px;
+                        transition: all 0.3s ease;
                     }
                     ::-webkit-scrollbar-thumb:hover {
                         background: #5a8c00;
+                        transform: scaleY(1.1);
                     }
                     
-                    /* Loading spinner customization */
+                    /* Enhanced loading spinner customization */
                     .spinner-border-sm {
                         color: #76B900 !important;
+                        animation: spin 0.75s linear infinite, pulse 2s ease-in-out infinite;
+                    }
+                    
+                    @keyframes pulse {
+                        0%, 100% { opacity: 1; }
+                        50% { opacity: 0.5; }
                     }
                     
                     /* Modal animation enhancement */
                     .modal.fade .modal-dialog {
-                        transition: transform 0.3s ease-out;
+                        transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+                        transform: scale(0.9) translateY(-50px);
                     }
                     
-                    /* Table enhancement */
+                    .modal.show .modal-dialog {
+                        transform: scale(1) translateY(0);
+                    }
+                    
+                    /* Table enhancement with staggered row animation */
                     .dash-table-container {
                         border-radius: 8px;
                         overflow: hidden;
                         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                        animation: tableSlideIn 0.8s ease-out;
+                    }
+                    
+                    @keyframes tableSlideIn {
+                        0% {
+                            opacity: 0;
+                            transform: translateX(-30px);
+                        }
+                        100% {
+                            opacity: 1;
+                            transform: translateX(0);
+                        }
+                    }
+                    
+                    /* Chart animation */
+                    .js-plotly-plot {
+                        animation: chartFadeIn 1s ease-out;
+                    }
+                    
+                    @keyframes chartFadeIn {
+                        0% {
+                            opacity: 0;
+                            transform: scale(0.95);
+                        }
+                        100% {
+                            opacity: 1;
+                            transform: scale(1);
+                        }
+                    }
+                    
+                    /* Loading dots animation */
+                    .loading-dots {
+                        display: inline-block;
+                        position: relative;
+                        width: 80px;
+                        height: 80px;
+                    }
+                    
+                    .loading-dots div {
+                        position: absolute;
+                        top: 33px;
+                        width: 13px;
+                        height: 13px;
+                        border-radius: 50%;
+                        background: #76B900;
+                        animation-timing-function: cubic-bezier(0, 1, 1, 0);
+                    }
+                    
+                    .loading-dots div:nth-child(1) {
+                        left: 8px;
+                        animation: loading-dots1 0.6s infinite;
+                    }
+                    
+                    .loading-dots div:nth-child(2) {
+                        left: 8px;
+                        animation: loading-dots2 0.6s infinite;
+                    }
+                    
+                    .loading-dots div:nth-child(3) {
+                        left: 32px;
+                        animation: loading-dots2 0.6s infinite;
+                    }
+                    
+                    .loading-dots div:nth-child(4) {
+                        left: 56px;
+                        animation: loading-dots3 0.6s infinite;
+                    }
+                    
+                    @keyframes loading-dots1 {
+                        0% { transform: scale(0); }
+                        100% { transform: scale(1); }
+                    }
+                    
+                    @keyframes loading-dots3 {
+                        0% { transform: scale(1); }
+                        100% { transform: scale(0); }
+                    }
+                    
+                    @keyframes loading-dots2 {
+                        0% { transform: translate(0, 0); }
+                        100% { transform: translate(24px, 0); }
+                    }
+                    
+                    /* Fade in animation utility class */
+                    .fade-in {
+                        animation: fadeIn 0.6s ease-in-out;
+                    }
+                    
+                    @keyframes fadeIn {
+                        0% { 
+                            opacity: 0; 
+                            transform: translateY(15px);
+                        }
+                        100% { 
+                            opacity: 1; 
+                            transform: translateY(0);
+                        }
+                    }
+                    
+                    /* Success animation for data loading */
+                    .success-checkmark {
+                        width: 56px;
+                        height: 56px;
+                        border-radius: 50%;
+                        display: block;
+                        stroke-width: 2;
+                        stroke: #76B900;
+                        stroke-miterlimit: 10;
+                        margin: 10px auto;
+                        box-shadow: inset 0px 0px 0px #76B900;
+                        animation: fill 0.4s ease-in-out 0.4s forwards, scale 0.3s ease-in-out 0.9s both;
+                    }
+                    
+                    .success-checkmark__circle {
+                        stroke-dasharray: 166;
+                        stroke-dashoffset: 166;
+                        stroke-width: 2;
+                        stroke-miterlimit: 10;
+                        stroke: #76B900;
+                        fill: none;
+                        animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+                    }
+                    
+                    .success-checkmark__check {
+                        transform-origin: 50% 50%;
+                        stroke-dasharray: 48;
+                        stroke-dashoffset: 48;
+                        animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+                    }
+                    
+                    @keyframes stroke {
+                        100% { stroke-dashoffset: 0; }
+                    }
+                    
+                    @keyframes scale {
+                        0%, 100% { transform: none; }
+                        50% { transform: scale3d(1.1, 1.1, 1); }
+                    }
+                    
+                    @keyframes fill {
+                        100% { box-shadow: inset 0px 0px 0px 30px #76B900; }
+                    }
+                    
+                    /* Smooth badge animations */
+                    .badge {
+                        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                        animation: bounceIn 0.6s ease-out;
+                    }
+                    
+                    @keyframes bounceIn {
+                        0% { 
+                            opacity: 0; 
+                            transform: scale(0.3);
+                        }
+                        50% { 
+                            opacity: 1; 
+                            transform: scale(1.05);
+                        }
+                        70% { 
+                            transform: scale(0.9);
+                        }
+                        100% { 
+                            opacity: 1; 
+                            transform: scale(1);
+                        }
+                    }
+                    
+                    /* Enhanced filter animations */
+                    .dropdown, .form-control, .form-select {
+                        transition: all 0.3s ease-in-out;
+                        border-radius: 8px;
+                    }
+                    
+                    .dropdown:hover, .form-control:hover, .form-select:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 12px rgba(118, 185, 0, 0.1);
                     }
                 </style>
             </head>
@@ -484,8 +863,17 @@ class CodetDashboard:
         def update_tab_content(active_tab, start_date, end_date, selected_authors, 
                              selected_repos, selected_filetypes, n_intervals):
             try:
+                # show initial loading state
+                import time
+                if callback_context.triggered:
+                    trigger_id = callback_context.triggered[0]["prop_id"].split(".")[0]
+                    # add small delay for loading animation to be visible
+                    if trigger_id in ['main-tabs', 'date-range-picker', 'author-dropdown', 'repo-dropdown', 'filetype-dropdown']:
+                        time.sleep(0.1)  # brief pause for smooth UX
+                
                 # reload data on interval
                 if n_intervals > 0:
+                    print("📡 refreshing data...")
                     self.load_data()
                 
                 # print debug information
@@ -508,6 +896,7 @@ class CodetDashboard:
                 print(f"After defaults - Authors: {len(selected_authors)}, Repos: {len(selected_repos)}, FileTypes: {len(selected_filetypes)}")
                 
                 # filter data based on selections
+                print("🔄 filtering data...")
                 filtered_commits = self._filter_data(
                     start_date, end_date, selected_authors, selected_repos
                 )
@@ -518,22 +907,45 @@ class CodetDashboard:
                 print(f"After filtering - Commits: {len(filtered_commits)}, Files: {len(filtered_files)}")
                 print(f"=========================")
                 
-                if active_tab == "overview":
-                    return self._create_overview_tab(filtered_commits, filtered_files)
-                elif active_tab == "hotspots":
-                    return self._create_hotspots_tab(filtered_files)
-                elif active_tab == "timeline":
-                    return self._create_timeline_tab(filtered_commits)
-                elif active_tab == "details":
-                    return self._create_details_tab(filtered_commits)
-                elif active_tab == "json-browser":
-                    return self._create_json_browser_tab()
+                # add fade-in animation wrapper to all content
+                content_wrapper = lambda content: html.Div(content, className="fade-in")
                 
-                return html.Div("Select a tab to view content")
+                if active_tab == "overview":
+                    print("📊 generating overview...")
+                    return content_wrapper(self._create_overview_tab(filtered_commits, filtered_files))
+                elif active_tab == "hotspots":
+                    print("🔥 analyzing hotspots...")
+                    return content_wrapper(self._create_hotspots_tab(filtered_files))
+                elif active_tab == "timeline":
+                    print("📈 building timeline...")
+                    return content_wrapper(self._create_timeline_tab(filtered_commits))
+                elif active_tab == "details":
+                    print("📋 preparing details...")
+                    return content_wrapper(self._create_details_tab(filtered_commits))
+                elif active_tab == "json-browser":
+                    print("📄 loading JSON browser...")
+                    return content_wrapper(self._create_json_browser_tab())
+                
+                return content_wrapper(html.Div("Select a tab to view content"))
                 
             except Exception as e:
-                return dbc.Alert(f"Error loading content: {str(e)}", 
-                               style={'backgroundColor': '#ffe6e6', 'color': '#000000', 'border': '2px solid #000000'})
+                print(f"❌ Error in callback: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                
+                error_content = dbc.Alert([
+                    html.H6("⚠️ Loading Error", className="mb-2"),
+                    html.P(f"Error Message: {str(e)}", className="mb-2"),
+                    html.Small("Please check data format or contact support", className="text-muted")
+                ], color="warning", style={
+                    'backgroundColor': '#fff3cd', 
+                    'color': '#856404', 
+                    'border': '2px solid #ffeaa7',
+                    'borderRadius': '8px',
+                    'animation': 'slideInUp 0.5s ease-out'
+                })
+                
+                return html.Div(error_content, className="fade-in")
         
         # modal callbacks for AI Summary details
         @callback(
@@ -717,84 +1129,196 @@ Feel free to examine the commit details in the main table for more context."""
         return filtered_df
     
     def _create_overview_tab(self, commits_df, files_df):
-        """Create overview tab content"""
+        """Create overview tab content with enhanced animations"""
         if commits_df.empty:
-            return dbc.Alert("No data matches your filter criteria.", 
-                           style={'backgroundColor': '#f0f8f0', 'color': '#000000', 'border': '2px solid #76B900'})
+            return dbc.Alert([
+                html.I(className="fas fa-info-circle", style={'marginRight': '10px'}),
+                "No data matches your filter criteria. Please adjust the filter settings."
+            ], style={
+                'backgroundColor': '#f0f8f0', 
+                'color': '#000000', 
+                'border': '2px solid #76B900',
+                'borderRadius': '8px',
+                'animation': 'slideInUp 0.5s ease-out'
+            })
         
-        # summary statistics with dashboard colors
+        # enhanced summary statistics with animated numbers
         stats_cards = dbc.Row([
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
-                        html.H4(len(commits_df), style={'color': '#76B900', 'fontWeight': 'bold'}),
-                        html.P("Total Commits", className="mb-0", style={'color': '#000000'})
+                        html.Div([
+                            html.I(className="fas fa-code-branch", style={
+                                'fontSize': '24px', 
+                                'color': '#76B900',
+                                'marginBottom': '10px',
+                                'animation': 'bounceIn 0.8s ease-out'
+                            }),
+                            html.H4(len(commits_df), 
+                                   style={'color': '#76B900', 'fontWeight': 'bold'}, 
+                                   className="animated-counter"),
+                            html.P("Total Commits", className="mb-0", style={'color': '#000000', 'fontWeight': '500'})
+                        ], style={'textAlign': 'center'})
                     ])
-                ], style={'backgroundColor': '#ffffff', 'border': '2px solid #76B900'})
+                ], style={
+                    'backgroundColor': '#ffffff', 
+                    'border': '2px solid #76B900',
+                    'borderRadius': '12px',
+                    'transition': 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    'animation': 'slideInUp 0.6s ease-out'  
+                }, className="h-100 shadow-hover")
             ], width=3),
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
-                        html.H4(commits_df['author'].nunique(), style={'color': '#000000', 'fontWeight': 'bold'}),
-                        html.P("Unique Authors", className="mb-0", style={'color': '#000000'})
+                        html.Div([
+                            html.I(className="fas fa-users", style={
+                                'fontSize': '24px', 
+                                'color': '#000000',
+                                'marginBottom': '10px',
+                                'animation': 'bounceIn 0.8s ease-out 0.1s both'
+                            }),
+                            html.H4(commits_df['author'].nunique(), 
+                                   style={'color': '#000000', 'fontWeight': 'bold'},
+                                   className="animated-counter"),
+                            html.P("Active Authors", className="mb-0", style={'color': '#000000', 'fontWeight': '500'})
+                        ], style={'textAlign': 'center'})
                     ])
-                ], style={'backgroundColor': '#f0f8f0', 'border': '2px solid #000000'})
+                ], style={
+                    'backgroundColor': '#f0f8f0', 
+                    'border': '2px solid #000000',
+                    'borderRadius': '12px',
+                    'transition': 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    'animation': 'slideInUp 0.6s ease-out 0.1s both'
+                }, className="h-100 shadow-hover")
             ], width=3),
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
-                        html.H4(commits_df['repo_name'].nunique(), style={'color': '#76B900', 'fontWeight': 'bold'}),
-                        html.P("Repositories", className="mb-0", style={'color': '#000000'})
+                        html.Div([
+                            html.I(className="fas fa-folder", style={
+                                'fontSize': '24px', 
+                                'color': '#76B900',
+                                'marginBottom': '10px',
+                                'animation': 'bounceIn 0.8s ease-out 0.2s both'
+                            }),
+                            html.H4(commits_df['repo_name'].nunique(), 
+                                   style={'color': '#76B900', 'fontWeight': 'bold'},
+                                   className="animated-counter"),
+                            html.P("Repositories", className="mb-0", style={'color': '#000000', 'fontWeight': '500'})
+                        ], style={'textAlign': 'center'})
                     ])
-                ], style={'backgroundColor': '#ffffff', 'border': '2px solid #76B900'})
+                ], style={
+                    'backgroundColor': '#ffffff', 
+                    'border': '2px solid #76B900',
+                    'borderRadius': '12px',
+                    'transition': 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    'animation': 'slideInUp 0.6s ease-out 0.2s both'
+                }, className="h-100 shadow-hover")
             ], width=3),
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
-                        html.H4(len(files_df), style={'color': '#000000', 'fontWeight': 'bold'}),
-                        html.P("File Changes", className="mb-0", style={'color': '#000000'})
+                        html.Div([
+                            html.I(className="fas fa-file-alt", style={
+                                'fontSize': '24px', 
+                                'color': '#000000',
+                                'marginBottom': '10px',
+                                'animation': 'bounceIn 0.8s ease-out 0.3s both'
+                            }),
+                            html.H4(len(files_df), 
+                                   style={'color': '#000000', 'fontWeight': 'bold'},
+                                   className="animated-counter"),
+                            html.P("File Changes", className="mb-0", style={'color': '#000000', 'fontWeight': '500'})
+                        ], style={'textAlign': 'center'})
                     ])
-                ], style={'backgroundColor': '#f0f8f0', 'border': '2px solid #000000'})
+                ], style={
+                    'backgroundColor': '#f0f8f0', 
+                    'border': '2px solid #000000',
+                    'borderRadius': '12px',
+                    'transition': 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    'animation': 'slideInUp 0.6s ease-out 0.3s both'
+                }, className="h-100 shadow-hover")
             ], width=3)
         ], className="mb-4")
         
-        # charts
+        # enhanced charts with loading states
         charts_row = dbc.Row([
             dbc.Col([
                 dbc.Card([
-                    dbc.CardHeader("📊 Commits by Author", 
-                                  style={'backgroundColor': '#f0f8f0', 'color': '#000000', 'fontWeight': 'bold', 'border': 'none', 'borderBottom': '3px solid #76B900'}),
+                    dbc.CardHeader([
+                        html.I(className="fas fa-chart-bar", style={'marginRight': '10px', 'color': '#76B900'}),
+                        "Commits by Author"
+                    ], style={
+                        'backgroundColor': '#f0f8f0', 
+                        'color': '#000000', 
+                        'fontWeight': 'bold', 
+                        'border': 'none', 
+                        'borderBottom': '3px solid #76B900',
+                        'borderRadius': '8px 8px 0 0'
+                    }),
                     dbc.CardBody([
-                        dcc.Graph(
-                            figure=self._create_author_chart(commits_df),
-                            config={'displayModeBar': False}
+                        dcc.Loading(
+                            children=[
+                                dcc.Graph(
+                                    figure=self._create_author_chart(commits_df),
+                                    config={'displayModeBar': False},
+                                    style={'animation': 'chartFadeIn 1s ease-out'}
+                                )
+                            ],
+                            type="default",
+                            color="#76B900"
                         )
                     ])
-                ])
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out 0.4s both'})
             ], width=6),
             dbc.Col([
                 dbc.Card([
-                    dbc.CardHeader("📁 Commits by Repository", 
-                                  style={'backgroundColor': '#f0f8f0', 'color': '#000000', 'fontWeight': 'bold', 'border': 'none', 'borderBottom': '3px solid #76B900'}),
+                    dbc.CardHeader([
+                        html.I(className="fas fa-chart-pie", style={'marginRight': '10px', 'color': '#76B900'}),
+                        "Commits by Repository"
+                    ], style={
+                        'backgroundColor': '#f0f8f0', 
+                        'color': '#000000', 
+                        'fontWeight': 'bold', 
+                        'border': 'none', 
+                        'borderBottom': '3px solid #76B900',
+                        'borderRadius': '8px 8px 0 0'
+                    }),
                     dbc.CardBody([
-                        dcc.Graph(
-                            figure=self._create_repo_chart(commits_df),
-                            config={'displayModeBar': False}
+                        dcc.Loading(
+                            children=[
+                                dcc.Graph(
+                                    figure=self._create_repo_chart(commits_df),
+                                    config={'displayModeBar': False},
+                                    style={'animation': 'chartFadeIn 1s ease-out 0.2s both'}
+                                )
+                            ],
+                            type="default",
+                            color="#76B900"
                         )
                     ])
-                ])
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out 0.5s both'})
             ], width=6)
         ])
         
         return html.Div([stats_cards, charts_row])
     
     def _create_hotspots_tab(self, files_df):
-        """Create hotspots analysis tab"""
+        """Create hotspots analysis tab with enhanced animations"""
         if files_df.empty:
-            return dbc.Alert("No file data matches your filter criteria.", 
-                           style={'backgroundColor': '#f0f8f0', 'color': '#000000', 'border': '2px solid #76B900'})
+            return dbc.Alert([
+                html.I(className="fas fa-info-circle", style={'marginRight': '10px'}),
+                "No data matches your filter criteria. Please adjust the filter settings."
+            ], style={
+                'backgroundColor': '#f0f8f0', 
+                'color': '#000000', 
+                'border': '2px solid #76B900',
+                'borderRadius': '8px',
+                'animation': 'slideInUp 0.5s ease-out'
+            })
         
-        # file hotspots analysis
+        # file hotspots analysis with animations
         file_counts = files_df['file_path'].value_counts().head(20)
         dir_counts = files_df['file_dir'].value_counts().head(15)
         ext_counts = files_df['file_ext'].value_counts().head(10)
@@ -802,105 +1326,236 @@ Feel free to examine the commit details in the main table for more context."""
         hotspots_row = dbc.Row([
             dbc.Col([
                 dbc.Card([
-                    dbc.CardHeader("🔥 Top Modified Files", 
-                                  style={'backgroundColor': '#f0f8f0', 'color': '#000000', 'fontWeight': 'bold', 'border': 'none', 'borderBottom': '3px solid #76B900'}),
+                    dbc.CardHeader([
+                        html.I(className="fas fa-fire", style={'marginRight': '10px', 'color': '#ff6b6b'}),
+                        "Most Active Files"
+                    ], style={
+                        'backgroundColor': '#f0f8f0', 
+                        'color': '#000000', 
+                        'fontWeight': 'bold', 
+                        'border': 'none', 
+                        'borderBottom': '3px solid #76B900',
+                        'borderRadius': '8px 8px 0 0'
+                    }),
                     dbc.CardBody([
-                        dcc.Graph(
-                            figure=self._create_file_hotspots_chart(file_counts),
-                            config={'displayModeBar': False}
+                        dcc.Loading(
+                            children=[
+                                dcc.Graph(
+                                    figure=self._create_file_hotspots_chart(file_counts),
+                                    config={'displayModeBar': False},
+                                    style={'animation': 'chartFadeIn 1s ease-out'}
+                                )
+                            ],
+                            type="default",
+                            color="#76B900"
                         )
                     ])
-                ])
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out'})
             ], width=6),
             dbc.Col([
                 dbc.Card([
-                    dbc.CardHeader("📂 Directory Activity", 
-                                  style={'backgroundColor': '#f0f8f0', 'color': '#000000', 'fontWeight': 'bold', 'border': 'none', 'borderBottom': '3px solid #76B900'}),
+                    dbc.CardHeader([
+                        html.I(className="fas fa-folder-open", style={'marginRight': '10px', 'color': '#4ecdc4'}),
+                        "Directory Activity"
+                    ], style={
+                        'backgroundColor': '#f0f8f0', 
+                        'color': '#000000', 
+                        'fontWeight': 'bold', 
+                        'border': 'none', 
+                        'borderBottom': '3px solid #76B900',
+                        'borderRadius': '8px 8px 0 0'
+                    }),
                     dbc.CardBody([
-                        dcc.Graph(
-                            figure=self._create_directory_chart(dir_counts),
-                            config={'displayModeBar': False}
+                        dcc.Loading(
+                            children=[
+                                dcc.Graph(
+                                    figure=self._create_directory_chart(dir_counts),
+                                    config={'displayModeBar': False},
+                                    style={'animation': 'chartFadeIn 1s ease-out 0.2s both'}
+                                )
+                            ],
+                            type="default",
+                            color="#76B900"
                         )
                     ])
-                ])
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out 0.1s both'})
             ], width=6)
         ], className="mb-4")
         
         extensions_row = dbc.Row([
             dbc.Col([
                 dbc.Card([
-                    dbc.CardHeader("📄 File Type Distribution", 
-                                  style={'backgroundColor': '#f0f8f0', 'color': '#000000', 'fontWeight': 'bold', 'border': 'none', 'borderBottom': '3px solid #76B900'}),
+                    dbc.CardHeader([
+                        html.I(className="fas fa-code", style={'marginRight': '10px', 'color': '#45b7d1'}),
+                        "File Type Distribution"
+                    ], style={
+                        'backgroundColor': '#f0f8f0', 
+                        'color': '#000000', 
+                        'fontWeight': 'bold', 
+                        'border': 'none', 
+                        'borderBottom': '3px solid #76B900',
+                        'borderRadius': '8px 8px 0 0'
+                    }),
                     dbc.CardBody([
-                        dcc.Graph(
-                            figure=self._create_extensions_chart(ext_counts),
-                            config={'displayModeBar': False}
+                        dcc.Loading(
+                            children=[
+                                dcc.Graph(
+                                    figure=self._create_extensions_chart(ext_counts),
+                                    config={'displayModeBar': False},
+                                    style={'animation': 'chartFadeIn 1s ease-out 0.4s both'}
+                                )
+                            ],
+                            type="default",
+                            color="#76B900"
                         )
                     ])
-                ])
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out 0.2s both'})
             ], width=12)
         ])
         
         return html.Div([hotspots_row, extensions_row])
     
     def _create_timeline_tab(self, commits_df):
-        """Create timeline analysis tab"""
+        """Create timeline analysis tab with enhanced animations"""
         if commits_df.empty:
-            return dbc.Alert("No commit data matches your filter criteria.", 
-                           style={'backgroundColor': '#f0f8f0', 'color': '#000000', 'border': '2px solid #76B900'})
+            return dbc.Alert([
+                html.I(className="fas fa-info-circle", style={'marginRight': '10px'}),
+                "No data matches your filter criteria. Please adjust the filter settings."
+            ], style={
+                'backgroundColor': '#f0f8f0', 
+                'color': '#000000', 
+                'border': '2px solid #76B900',
+                'borderRadius': '8px',
+                'animation': 'slideInUp 0.5s ease-out'
+            })
         
         timeline_chart = dbc.Card([
-            dbc.CardHeader("📈 Commit Timeline", 
-                          style={'backgroundColor': '#f0f8f0', 'color': '#000000', 'fontWeight': 'bold', 'border': 'none', 'borderBottom': '3px solid #76B900'}),
+            dbc.CardHeader([
+                html.I(className="fas fa-chart-line", style={'marginRight': '10px', 'color': '#76B900'}),
+                "Commit Timeline"
+            ], style={
+                'backgroundColor': '#f0f8f0', 
+                'color': '#000000', 
+                'fontWeight': 'bold', 
+                'border': 'none', 
+                'borderBottom': '3px solid #76B900',
+                'borderRadius': '8px 8px 0 0'
+            }),
             dbc.CardBody([
-                dcc.Graph(
-                    figure=self._create_timeline_chart(commits_df),
-                    config={'displayModeBar': True}
+                dcc.Loading(
+                    children=[
+                        dcc.Graph(
+                            figure=self._create_timeline_chart(commits_df),
+                            config={'displayModeBar': True},
+                            style={'animation': 'chartFadeIn 1.2s ease-out'}
+                        )
+                    ],
+                    type="default",
+                    color="#76B900"
                 )
             ])
-        ])
+        ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out'})
         
         return timeline_chart
     
     def _create_details_tab(self, commits_df):
-        """Create detailed commits table tab"""
+        """Create detailed commits table tab with enhanced animations"""
         if commits_df.empty:
-            return dbc.Alert("No commit data matches your filter criteria.", 
-                           style={'backgroundColor': '#f0f8f0', 'color': '#000000', 'border': '2px solid #76B900'})
+            return dbc.Alert([
+                html.I(className="fas fa-info-circle", style={'marginRight': '10px'}),
+                "No data matches your filter criteria. Please adjust the filter settings."
+            ], style={
+                'backgroundColor': '#f0f8f0', 
+                'color': '#000000', 
+                'border': '2px solid #76B900',
+                'borderRadius': '8px',
+                'animation': 'slideInUp 0.5s ease-out'
+            })
         
-        # prepare data for table
+        # prepare data for table with enhanced formatting
         table_data = commits_df[['commit_short', 'repo_name', 'author', 'date', 'summary', 'files_count']].copy()
         table_data['date'] = table_data['date'].dt.strftime('%Y-%m-%d %H:%M')
         
         details_table = dbc.Card([
-            dbc.CardHeader("📋 Detailed Commit Information", 
-                          style={'backgroundColor': '#f0f8f0', 'color': '#000000', 'fontWeight': 'bold', 'border': 'none', 'borderBottom': '3px solid #76B900'}),
+            dbc.CardHeader([
+                html.I(className="fas fa-table", style={'marginRight': '10px', 'color': '#76B900'}),
+                "Detailed Commit Information"
+            ], style={
+                'backgroundColor': '#f0f8f0', 
+                'color': '#000000', 
+                'fontWeight': 'bold', 
+                'border': 'none', 
+                'borderBottom': '3px solid #76B900',
+                'borderRadius': '8px 8px 0 0'
+            }),
             dbc.CardBody([
-                dash_table.DataTable(
-                    data=table_data.to_dict('records'),
-                    columns=[
-                        {'name': 'Commit', 'id': 'commit_short'},
-                        {'name': 'Repository', 'id': 'repo_name'},
-                        {'name': 'Author', 'id': 'author'},
-                        {'name': 'Date', 'id': 'date'},
-                        {'name': 'Summary', 'id': 'summary'},
-                        {'name': 'Files', 'id': 'files_count', 'type': 'numeric'},
+                dcc.Loading(
+                    children=[
+                        dash_table.DataTable(
+                            data=table_data.to_dict('records'),
+                            columns=[
+                                {'name': 'Commit Hash', 'id': 'commit_short'},
+                                {'name': 'Repository', 'id': 'repo_name'},
+                                {'name': 'Author', 'id': 'author'},
+                                {'name': 'Date', 'id': 'date'},
+                                {'name': 'Summary', 'id': 'summary'},
+                                {'name': 'Files Count', 'id': 'files_count', 'type': 'numeric'},
+                            ],
+                            style_cell={
+                                'textAlign': 'left', 
+                                'padding': '12px', 
+                                'fontFamily': 'system-ui, -apple-system, sans-serif', 
+                                'fontSize': '13px',
+                                'transition': 'all 0.2s ease-in-out'
+                            },
+                            style_header={
+                                'backgroundColor': '#000000', 
+                                'color': '#ffffff', 
+                                'fontWeight': 'bold', 
+                                'border': '1px solid #76B900',
+                                'textAlign': 'center'
+                            },
+                            style_data={
+                                'backgroundColor': '#ffffff', 
+                                'color': '#000000', 
+                                'border': '1px solid #e0e0e0',
+                                'transition': 'all 0.2s ease-in-out'
+                            },
+                            style_data_conditional=[
+                                {
+                                    'if': {'row_index': 'odd'},
+                                    'backgroundColor': '#f8f9fa'
+                                },
+                                {
+                                    'if': {'state': 'active'},
+                                    'backgroundColor': 'rgba(118, 185, 0, 0.1)',
+                                    'border': '2px solid #76B900'
+                                }
+                            ],
+                            page_size=25,
+                            sort_action="native",
+                            filter_action="native",
+                            css=[
+                                {
+                                    'selector': '.dash-table-container',
+                                    'rule': 'animation: tableSlideIn 0.8s ease-out;'
+                                },
+                                {
+                                    'selector': '.dash-table-container .dash-cell',
+                                    'rule': 'transition: all 0.2s ease-in-out;'
+                                },
+                                {
+                                    'selector': '.dash-table-container .dash-cell:hover',
+                                    'rule': 'background-color: rgba(118, 185, 0, 0.05) !important; transform: scale(1.01);'
+                                }
+                            ]
+                        )
                     ],
-                    style_cell={'textAlign': 'left', 'padding': '10px', 'fontFamily': 'system-ui, -apple-system, sans-serif', 'fontSize': '12px'},
-                    style_header={'backgroundColor': '#000000', 'color': '#ffffff', 'fontWeight': 'bold', 'border': '1px solid #76B900'},
-                    style_data={'backgroundColor': '#ffffff', 'color': '#000000', 'border': '1px solid #cccccc'},
-                    style_data_conditional=[
-                        {
-                            'if': {'row_index': 'odd'},
-                            'backgroundColor': '#f8f9fa'
-                        }
-                    ],
-                    page_size=120,
-                    sort_action="native",
-                    filter_action="native"
+                    type="default",
+                    color="#76B900"
                 )
             ])
-        ])
+        ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out'})
         
         return details_table
     
@@ -1467,6 +2122,94 @@ Feel free to examine the commit details in the main table for more context."""
         fig.update_yaxes(gridcolor='#cccccc', zerolinecolor='#cccccc')
         fig.update_traces(line=dict(color='#76B900', width=3))
         return fig
+    
+    def _create_loading_skeleton(self, component_type="card"):
+        """Create skeleton loading placeholders for smooth UX"""
+        if component_type == "card":
+            return dbc.Card([
+                dbc.CardBody([
+                    html.Div(className="skeleton", style={'height': '60px', 'width': '100%', 'marginBottom': '10px'}),
+                    html.Div(className="skeleton", style={'height': '20px', 'width': '80%', 'marginBottom': '5px'}),
+                    html.Div(className="skeleton", style={'height': '20px', 'width': '60%'}),
+                ])
+            ], className="mb-3")
+        elif component_type == "chart":
+            return dbc.Card([
+                dbc.CardHeader([
+                    html.Div(className="skeleton", style={'height': '25px', 'width': '200px'})
+                ]),
+                dbc.CardBody([
+                    html.Div(className="skeleton", style={'height': '300px', 'width': '100%'})
+                ])
+            ])
+        elif component_type == "table":
+            return dbc.Card([
+                dbc.CardHeader([
+                    html.Div(className="skeleton", style={'height': '25px', 'width': '250px'})
+                ]),
+                dbc.CardBody([
+                    html.Div([
+                        html.Div(className="skeleton", style={'height': '40px', 'width': '100%', 'marginBottom': '5px'})
+                        for _ in range(8)
+                    ])
+                ])
+            ])
+        else:
+            return html.Div(className="skeleton", style={'height': '100px', 'width': '100%'})
+    
+    def _create_loading_indicator(self, text="Loading...", show_progress=True):
+        """Create enhanced loading indicator with smooth animations"""
+        components = [
+            html.Div(className="loading-container", children=[
+                # beautiful loading dots animation
+                html.Div(className="loading-dots", children=[
+                    html.Div(),
+                    html.Div(),
+                    html.Div(), 
+                    html.Div(),
+                ]),
+                html.H5(text, style={
+                    'color': '#76B900', 
+                    'fontWeight': '500',
+                    'marginTop': '20px',
+                    'animation': 'pulse 2s ease-in-out infinite'
+                }),
+            ])
+        ]
+        
+        if show_progress:
+            components.append(
+                html.Div(className="progress-bar", children=[
+                    html.Div(className="progress-fill")
+                ], style={'width': '200px', 'margin': '20px auto'})
+            )
+        
+        return html.Div(components, className="fade-in")
+    
+    def _create_success_indicator(self, text="Loading Complete!", show_checkmark=True):
+        """Create success indicator with checkmark animation"""
+        components = []
+        
+        if show_checkmark:
+            components.append(
+                html.Div([
+                    html.Svg(className="success-checkmark", children=[
+                        html.Circle(className="success-checkmark__circle", cx="26", cy="26", r="25", fill="none"),
+                        html.Path(className="success-checkmark__check", fill="none", d="m14.1 27.2l7.1 7.2 16.7-16.8")
+                    ], viewBox="0 0 52 52")
+                ])
+            )
+            
+        components.extend([
+            html.H6(text, style={
+                'color': '#76B900', 
+                'fontWeight': '600',
+                'textAlign': 'center',
+                'marginTop': '15px'
+            })
+        ])
+        
+        return html.Div(components, className="fade-in", style={'textAlign': 'center', 'padding': '20px'})
 
 
 def create_parser():
@@ -1512,26 +2255,28 @@ def main():
     
     # check if path exists
     if not os.path.exists(args.path):
-        print(f"Error: Path '{args.path}' does not exist")
+        print(f"❌ Error: Path '{args.path}' does not exist")
         return 1
     
     # create dashboard instance
+    print("🚀 initializing Codet Dashboard...")
     dashboard = CodetDashboard(args.path)
     
-    # load data
-    print("Loading data...")
+    # load data with progress indicators
+    print("📂 loading data...")
     if not dashboard.load_data():
-        print("Failed to load data. Please check your JSON file format.")
+        print("❌ Failed to load data. Please check your JSON file format.")
         return 1
     
-    print(f"Successfully loaded {len(dashboard.df_commits)} commits and {len(dashboard.df_files)} file changes")
+    print(f"✅ Successfully loaded {len(dashboard.df_commits)} commits and {len(dashboard.df_files)} file changes")
     
     # create and run app
-    print("Creating dashboard...")
+    print("🎨 creating beautiful dashboard...")
     app = dashboard.create_app()
     
-    print(f"Starting dashboard at http://{args.host}:{args.port}")
-    print("Press Ctrl+C to stop the server")
+    print(f"🌟 Starting smooth dashboard experience at http://{args.host}:{args.port}")
+    print("💡 Tip: Use Ctrl+C to stop the server")
+    print("🎯 Enjoy the smooth animations and enhanced UX!")
     
     try:
         app.run(
@@ -1540,7 +2285,7 @@ def main():
             debug=args.debug
         )
     except KeyboardInterrupt:
-        print("\nDashboard stopped.")
+        print("\n👋 Dashboard stopped gracefully. Thanks for using Codet!")
     
     return 0
 
