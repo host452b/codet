@@ -447,7 +447,7 @@ class CodetDashboard:
             dbc.Tab(label="🔥 Hotspots", tab_id="hotspots"),
             dbc.Tab(label="📈 Timeline", tab_id="timeline"),
             dbc.Tab(label="📋 Details", tab_id="details"),
-            dbc.Tab(label="📄 JSON Browser", tab_id="json-browser"),
+            dbc.Tab(label="📄 AI Summary", tab_id="json-browser"),
         ], id="main-tabs", active_tab="overview")
         
         # tab content
