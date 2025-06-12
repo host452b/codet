@@ -108,27 +108,74 @@ class CodetDashboard:
                     
                 # process commit data with robust date handling
                 commit_date = commit_info.get('commit_date', '')
+                original_date = commit_date
+                
+                # debug: show first few date samples
+                if len(commits_data) < 5:
+                    print(f"Sample date for commit {commit_hash[:8]}: '{original_date}' (type: {type(original_date)})")
+                
                 if commit_date:
                     try:
                         if isinstance(commit_date, str):
-                            # try different date formats
-                            for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d', '%Y-%m-%dT%H:%M:%S.%f']:
-                                try:
-                                    commit_date = datetime.strptime(commit_date.split('+')[0], fmt)  # handle timezone
-                                    break
-                                except ValueError:
-                                    continue
-                            else:
-                                # if no format worked, try pandas
-                                commit_date = pd.to_datetime(commit_date, errors='coerce')
-                                if pd.isna(commit_date):
-                                    commit_date = datetime.now()
+                            # use pandas for flexible date parsing first
+                            try:
+                                parsed_date = pd.to_datetime(commit_date, errors='coerce')
+                                if not pd.isna(parsed_date):
+                                    commit_date = parsed_date.to_pydatetime()
+                                else:
+                                    # try a few common manual formats as fallback
+                                    manual_formats = [
+                                        '%Y-%m-%dT%H:%M:%S',
+                                        '%Y-%m-%d %H:%M:%S', 
+                                        '%Y-%m-%d',
+                                        '%a %b %d %H:%M:%S %Y',  # Git format: Mon Jan 02 15:04:05 2006
+                                    ]
+                                    
+                                    parsed = False
+                                    for fmt in manual_formats:
+                                        try:
+                                            # clean the string for manual parsing
+                                            clean_date = commit_date.strip()
+                                            if clean_date.endswith('Z'):
+                                                clean_date = clean_date[:-1]
+                                            if '+' in clean_date:
+                                                clean_date = clean_date.split('+')[0].strip()
+                                            
+                                            commit_date = datetime.strptime(clean_date, fmt)
+                                            parsed = True
+                                            break
+                                        except ValueError:
+                                            continue
+                                    
+                                    if not parsed:
+                                        if len(commits_data) < 10:  # only show first 10 failures
+                                            print(f"Warning: Could not parse date '{original_date}' for commit {commit_hash[:8]}")
+                                        commit_date = None
+                            except Exception as e:
+                                if len(commits_data) < 10:
+                                    print(f"Warning: Date parsing error for '{original_date}': {e}")
+                                commit_date = None
+                                
+                        elif isinstance(commit_date, (int, float)):
+                            # handle Unix timestamp
+                            try:
+                                if commit_date > 1e10:  # looks like milliseconds
+                                    commit_date = datetime.fromtimestamp(commit_date / 1000)
+                                else:
+                                    commit_date = datetime.fromtimestamp(commit_date)
+                            except Exception as e:
+                                print(f"Warning: Invalid timestamp {commit_date} for commit {commit_hash[:8]}: {e}")
+                                commit_date = None
                         elif not isinstance(commit_date, datetime):
-                            commit_date = datetime.now()
-                    except:
-                        commit_date = datetime.now()
+                            if len(commits_data) < 10:
+                                print(f"Warning: Invalid date type {type(commit_date)} for commit {commit_hash[:8]}: {commit_date}")
+                            commit_date = None
+                    except Exception as e:
+                        if len(commits_data) < 10:
+                            print(f"Warning: Date parsing error for commit {commit_hash[:8]}: {e}")
+                        commit_date = None
                 else:
-                    commit_date = datetime.now()
+                    commit_date = None  # Use None for missing dates
                 
                 commit_data = {
                     'repo_name': repo_name,
@@ -171,10 +218,20 @@ class CodetDashboard:
         if not self.df_commits.empty:
             print(f"  Unique repositories: {self.df_commits['repo_name'].unique().tolist()}")
             print(f"  Unique authors: {self.df_commits['author'].nunique()}")
-        
-        # ensure date columns are datetime type
-        if not self.df_commits.empty and 'date' in self.df_commits.columns:
+            
+            # ensure date columns are datetime type
             self.df_commits['date'] = pd.to_datetime(self.df_commits['date'], errors='coerce')
+            
+            # show date statistics
+            valid_dates = self.df_commits['date'].notna().sum()
+            invalid_dates = len(self.df_commits) - valid_dates
+            print(f"  Valid dates: {valid_dates}, Invalid dates: {invalid_dates}")
+            
+            if valid_dates > 0:
+                min_date = self.df_commits['date'].min()
+                max_date = self.df_commits['date'].max()
+                print(f"  Date range: {min_date} to {max_date}")
+            
         if not self.df_files.empty and 'date' in self.df_files.columns:
             self.df_files['date'] = pd.to_datetime(self.df_files['date'], errors='coerce')
         
@@ -327,10 +384,12 @@ class CodetDashboard:
                         html.Label("📅 Date Range", className="fw-bold mb-2"),
                         dcc.DatePickerRange(
                             id='date-range-picker',
-                            start_date=self.df_commits['date'].min() if not self.df_commits.empty else None,
-                            end_date=self.df_commits['date'].max() if not self.df_commits.empty else None,
+                            start_date=None,  # Don't set default dates to avoid over-filtering
+                            end_date=None,    # Let user choose dates manually
                             display_format='YYYY-MM-DD',
-                            style={'width': '100%'}
+                            style={'width': '100%'},
+                            start_date_placeholder_text='Start Date',
+                            end_date_placeholder_text='End Date'
                         )
                     ])
                 ])
@@ -429,6 +488,15 @@ class CodetDashboard:
                 if n_intervals > 0:
                     self.load_data()
                 
+                # print debug information
+                print(f"=== Filter Debug Info ===")
+                print(f"Total commits in df: {len(self.df_commits)}")
+                print(f"Total files in df: {len(self.df_files)}")
+                print(f"Date range: {start_date} to {end_date}")
+                print(f"Selected authors: {selected_authors}")
+                print(f"Selected repos: {selected_repos}")
+                print(f"Selected filetypes: {selected_filetypes}")
+                
                 # ensure selected values are not None
                 if selected_authors is None:
                     selected_authors = list(self.df_commits['author'].unique()) if not self.df_commits.empty else []
@@ -437,6 +505,8 @@ class CodetDashboard:
                 if selected_filetypes is None:
                     selected_filetypes = list(self.df_files['file_ext'].unique()) if not self.df_files.empty else []
                 
+                print(f"After defaults - Authors: {len(selected_authors)}, Repos: {len(selected_repos)}, FileTypes: {len(selected_filetypes)}")
+                
                 # filter data based on selections
                 filtered_commits = self._filter_data(
                     start_date, end_date, selected_authors, selected_repos
@@ -444,6 +514,9 @@ class CodetDashboard:
                 filtered_files = self._filter_files_data(
                     start_date, end_date, selected_authors, selected_repos, selected_filetypes
                 )
+                
+                print(f"After filtering - Commits: {len(filtered_commits)}, Files: {len(filtered_files)}")
+                print(f"=========================")
                 
                 if active_tab == "overview":
                     return self._create_overview_tab(filtered_commits, filtered_files)
@@ -550,32 +623,96 @@ Feel free to examine the commit details in the main table for more context."""
     def _filter_data(self, start_date, end_date, selected_authors, selected_repos):
         """Filter commits data based on selections"""
         filtered_df = self.df_commits.copy()
+        initial_count = len(filtered_df)
+        print(f"  Starting with {initial_count} commits")
         
         if start_date:
-            filtered_df = filtered_df[filtered_df['date'] >= start_date]
+            try:
+                before_count = len(filtered_df)
+                # Only filter records that have valid dates
+                filtered_df = filtered_df[
+                    (filtered_df['date'].notna()) & 
+                    (filtered_df['date'] >= start_date)
+                ]
+                after_count = len(filtered_df)
+                print(f"  After start_date filter ({start_date}): {after_count} commits (removed {before_count - after_count})")
+            except Exception as e:
+                print(f"  Error in start_date filter: {e}")
+                
         if end_date:
-            filtered_df = filtered_df[filtered_df['date'] <= end_date]
+            try:
+                before_count = len(filtered_df)
+                # Only filter records that have valid dates
+                filtered_df = filtered_df[
+                    (filtered_df['date'].notna()) & 
+                    (filtered_df['date'] <= end_date)
+                ]
+                after_count = len(filtered_df)
+                print(f"  After end_date filter ({end_date}): {after_count} commits (removed {before_count - after_count})")
+            except Exception as e:
+                print(f"  Error in end_date filter: {e}")
+                
         if selected_authors:
+            before_count = len(filtered_df)
             filtered_df = filtered_df[filtered_df['author'].isin(selected_authors)]
+            after_count = len(filtered_df)
+            print(f"  After authors filter: {after_count} commits (removed {before_count - after_count})")
+            
         if selected_repos:
+            before_count = len(filtered_df)
             filtered_df = filtered_df[filtered_df['repo_name'].isin(selected_repos)]
+            after_count = len(filtered_df)
+            print(f"  After repos filter: {after_count} commits (removed {before_count - after_count})")
             
         return filtered_df
     
     def _filter_files_data(self, start_date, end_date, selected_authors, selected_repos, selected_filetypes):
         """Filter files data based on selections"""
         filtered_df = self.df_files.copy()
+        initial_count = len(filtered_df)
+        print(f"  Starting with {initial_count} files")
         
         if start_date:
-            filtered_df = filtered_df[filtered_df['date'] >= start_date]
+            try:
+                before_count = len(filtered_df)
+                filtered_df = filtered_df[
+                    (filtered_df['date'].notna()) & 
+                    (filtered_df['date'] >= start_date)
+                ]
+                after_count = len(filtered_df)
+                print(f"  After start_date filter: {after_count} files (removed {before_count - after_count})")
+            except Exception as e:
+                print(f"  Error in files start_date filter: {e}")
+                
         if end_date:
-            filtered_df = filtered_df[filtered_df['date'] <= end_date]
+            try:
+                before_count = len(filtered_df)
+                filtered_df = filtered_df[
+                    (filtered_df['date'].notna()) & 
+                    (filtered_df['date'] <= end_date)
+                ]
+                after_count = len(filtered_df)
+                print(f"  After end_date filter: {after_count} files (removed {before_count - after_count})")
+            except Exception as e:
+                print(f"  Error in files end_date filter: {e}")
+                
         if selected_authors:
+            before_count = len(filtered_df)
             filtered_df = filtered_df[filtered_df['author'].isin(selected_authors)]
+            after_count = len(filtered_df)
+            print(f"  After authors filter: {after_count} files (removed {before_count - after_count})")
+            
         if selected_repos:
+            before_count = len(filtered_df)
             filtered_df = filtered_df[filtered_df['repo_name'].isin(selected_repos)]
+            after_count = len(filtered_df)
+            print(f"  After repos filter: {after_count} files (removed {before_count - after_count})")
+            
         if selected_filetypes:
+            before_count = len(filtered_df)
             filtered_df = filtered_df[filtered_df['file_ext'].isin(selected_filetypes)]
+            after_count = len(filtered_df)
+            print(f"  After filetypes filter: {after_count} files (removed {before_count - after_count})")
             
         return filtered_df
     
@@ -758,7 +895,7 @@ Feel free to examine the commit details in the main table for more context."""
                             'backgroundColor': '#f8f9fa'
                         }
                     ],
-                    page_size=12,
+                    page_size=120,
                     sort_action="native",
                     filter_action="native"
                 )
