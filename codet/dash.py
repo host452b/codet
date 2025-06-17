@@ -239,6 +239,19 @@ class CodetDashboard:
         if not self.df_files.empty and 'date' in self.df_files.columns:
             self.df_files['date'] = pd.to_datetime(self.df_files['date'], errors='coerce')
         
+        # additional debug info for files data
+        if not self.df_files.empty:
+            print(f"📁 Files data summary:")
+            print(f"  Columns: {self.df_files.columns.tolist()}")
+            print(f"  Shape: {self.df_files.shape}")
+            if 'file_path' in self.df_files.columns:
+                print(f"  Unique file paths: {self.df_files['file_path'].nunique()}")
+                print(f"  Sample file paths: {self.df_files['file_path'].head().tolist()}")
+            if 'file_ext' in self.df_files.columns:
+                print(f"  File extensions: {self.df_files['file_ext'].value_counts().head().to_dict()}")
+        else:
+            print("⚠️ df_files is empty after processing")
+        
         return len(commits_data) > 0
     
     def create_app(self):
@@ -713,6 +726,47 @@ class CodetDashboard:
                         box-shadow: 0 4px 12px rgba(118, 185, 0, 0.1);
                     }
                     
+                    /* Ensure dropdowns appear on top of all elements */
+                    .Select-menu-outer,
+                    .Select-menu,
+                    .dash-dropdown .Select-menu-outer,
+                    .dash-dropdown .Select-menu {
+                        z-index: 9999 !important;
+                        position: relative !important;
+                    }
+                    
+                    /* Ensure dropdown containers have proper z-index */
+                    .dash-dropdown,
+                    .dropdown,
+                    .Select,
+                    .Select-control {
+                        z-index: 100 !important;
+                        position: relative !important;
+                    }
+                    
+                    /* When dropdown is open, boost z-index even higher */
+                    .Select.is-open,
+                    .Select.is-open .Select-control,
+                    .Select.is-open .Select-menu-outer {
+                        z-index: 10000 !important;
+                    }
+                    
+                    /* Ensure date picker appears on top */
+                    .DateInput_input,
+                    .DateRangePickerInput,
+                    .DateRangePicker,
+                    .DayPicker,
+                    .DateInput_fang {
+                        z-index: 9998 !important;
+                    }
+                    
+                    /* Boost card z-index when it contains active dropdowns */
+                    .card:has(.Select.is-open),
+                    .card:has(.DateRangePicker) {
+                        z-index: 1000 !important;
+                        position: relative !important;
+                    }
+                    
 
                 </style>
             </head>
@@ -1041,6 +1095,40 @@ Feel free to examine the commit details in the main table for more context."""
                         return True, formatted_content, modal_title
             
             return is_open, "", "AI Analysis Details"
+        
+        # callback for hotspots tree heatmap
+        @callback(
+            Output('tree-heatmap-graph', 'figure'),
+            [Input('hotspots-date-range', 'start_date'),
+             Input('hotspots-date-range', 'end_date'),
+             Input('author-dropdown', 'value'),
+             Input('repo-dropdown', 'value'),
+             Input('filetype-dropdown', 'value')]
+        )
+        def update_tree_heatmap(start_date, end_date, selected_authors, selected_repos, selected_filetypes):
+            try:
+                # ensure selected values are not None, and default to all if nothing is selected
+                if selected_authors is None or len(selected_authors) == 0:
+                    selected_authors = list(self.df_commits['author'].unique()) if not self.df_commits.empty else []
+                if selected_repos is None or len(selected_repos) == 0:
+                    selected_repos = list(self.df_commits['repo_name'].unique()) if not self.df_commits.empty else []
+                if selected_filetypes is None or len(selected_filetypes) == 0:
+                    selected_filetypes = list(self.df_files['file_ext'].unique()) if not self.df_files.empty else []
+                
+                # get filtered files data using hotspots specific date range
+                filtered_files = self._filter_files_data(
+                    start_date, end_date, selected_authors, selected_repos, selected_filetypes
+                )
+                
+                print(f"🌳 Tree heatmap: processing {len(filtered_files)} file changes")
+                return self._create_tree_heatmap(filtered_files)
+                
+            except Exception as e:
+                print(f"❌ Error creating tree heatmap: {e}")
+                import traceback
+                traceback.print_exc()
+                # return empty figure on error
+                return self._create_empty_tree_heatmap()
     
     def _filter_data(self, start_date, end_date, selected_authors, selected_repos):
         """Filter commits data based on selections"""
@@ -1090,9 +1178,24 @@ Feel free to examine the commit details in the main table for more context."""
     
     def _filter_files_data(self, start_date, end_date, selected_authors, selected_repos, selected_filetypes):
         """Filter files data based on selections"""
+        print(f"🔍 _filter_files_data called with:")
+        print(f"  - start_date: {start_date}")
+        print(f"  - end_date: {end_date}")
+        print(f"  - selected_authors: {selected_authors}")
+        print(f"  - selected_repos: {selected_repos}")
+        print(f"  - selected_filetypes: {selected_filetypes}")
+        
         filtered_df = self.df_files.copy()
         initial_count = len(filtered_df)
         print(f"  Starting with {initial_count} files")
+        
+        # check if df_files has required columns
+        print(f"  df_files columns: {self.df_files.columns.tolist()}")
+        if 'file_path' in self.df_files.columns:
+            file_path_stats = self.df_files['file_path'].notna().sum()
+            print(f"  Valid file_path entries: {file_path_stats} out of {len(self.df_files)}")
+        else:
+            print("  ❌ file_path column missing!")
         
         if start_date:
             try:
@@ -1136,6 +1239,11 @@ Feel free to examine the commit details in the main table for more context."""
             after_count = len(filtered_df)
             print(f"  After filetypes filter: {after_count} files (removed {before_count - after_count})")
             
+        print(f"🔍 _filter_files_data returning {len(filtered_df)} files")
+        if not filtered_df.empty:
+            sample_files = filtered_df['file_path'].head(3).tolist() if 'file_path' in filtered_df.columns else []
+            print(f"  Sample files: {sample_files}")
+        
         return filtered_df
     
     def _create_overview_tab(self, commits_df, files_df):
@@ -1315,7 +1423,7 @@ Feel free to examine the commit details in the main table for more context."""
         return html.Div([stats_cards, charts_row])
     
     def _create_hotspots_tab(self, files_df):
-        """Create hotspots analysis tab with enhanced animations"""
+        """Create hotspots analysis tab with enhanced animations and tree heatmap"""
         if files_df.empty:
             return dbc.Alert([
                 html.I(className="fas fa-info-circle", style={'marginRight': '10px'}),
@@ -1328,12 +1436,80 @@ Feel free to examine the commit details in the main table for more context."""
                 'animation': 'slideInUp 0.5s ease-out'
             })
         
-        # file hotspots analysis with animations
+        # time range selector for hotspots analysis
+        time_selector_row = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.Label("📅 Hotspots Time Analysis", className="fw-bold mb-3"),
+                        dcc.DatePickerRange(
+                            id='hotspots-date-range',
+                            start_date=None,  # Let user select specific time range for hotspots analysis
+                            end_date=None,    # Default to no filter shows all data
+                            display_format='YYYY-MM-DD',
+                            style={'width': '100%'},
+                            start_date_placeholder_text='All time (start)',
+                            end_date_placeholder_text='All time (end)'
+                        )
+                    ])
+                ], style={'borderRadius': '8px', 'marginBottom': '20px'})
+            ], width=12)
+        ])
+        
+        # tree heatmap visualization
+        tree_heatmap_row = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader([
+                        html.I(className="fas fa-sitemap", style={'marginRight': '10px', 'color': '#e74c3c'}),
+                        "Directory Tree Heatmap - Modification Intensity"
+                    ], style={
+                        'backgroundColor': '#f0f8f0', 
+                        'color': '#000000', 
+                        'fontWeight': 'bold', 
+                        'border': 'none', 
+                        'borderBottom': '3px solid #76B900',
+                        'borderRadius': '8px 8px 0 0'
+                    }),
+                    dbc.CardBody([
+                        dcc.Loading(
+                            id="tree-heatmap-loading",
+                            children=[
+                                dcc.Graph(
+                                    id="tree-heatmap-graph",
+                                    config={'displayModeBar': True, 'displaylogo': False},
+                                    style={'height': '600px', 'animation': 'chartFadeIn 1s ease-out'}
+                                )
+                            ],
+                            type="default",
+                            color="#76B900"
+                        ),
+                        html.Div([
+                            html.P([
+                                html.Strong("🎨 Color Legend: "),
+                                html.Span("Green", style={'color': '#27AE60', 'fontWeight': 'bold'}),
+                                " (Low activity) → ",
+                                html.Span("Yellow", style={'color': '#F39C12', 'fontWeight': 'bold'}),
+                                " (Medium activity) → ",
+                                html.Span("Red", style={'color': '#E74C3C', 'fontWeight': 'bold'}),
+                                " (High activity)"
+                            ], className="mb-2"),
+                            html.P([
+                                html.Strong("💡 Usage: "),
+                                "Hover over sections to see detailed modification counts. Click to drill down into directories."
+                            ], className="text-muted small")
+                        ], style={'marginTop': '15px', 'padding': '10px', 'backgroundColor': '#f8f9fa', 'borderRadius': '6px'})
+                    ])
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out'})
+            ], width=12)
+        ], className="mb-4")
+        
+        # traditional charts row
         file_counts = files_df['file_path'].value_counts().head(20)
         dir_counts = files_df['file_dir'].value_counts().head(15)
         ext_counts = files_df['file_ext'].value_counts().head(10)
         
-        hotspots_row = dbc.Row([
+        traditional_charts_row = dbc.Row([
             dbc.Col([
                 dbc.Card([
                     dbc.CardHeader([
@@ -1360,7 +1536,7 @@ Feel free to examine the commit details in the main table for more context."""
                             color="#76B900"
                         )
                     ])
-                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out'})
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out 0.3s both'})
             ], width=6),
             dbc.Col([
                 dbc.Card([
@@ -1388,7 +1564,7 @@ Feel free to examine the commit details in the main table for more context."""
                             color="#76B900"
                         )
                     ])
-                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out 0.1s both'})
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out 0.4s both'})
             ], width=6)
         ], className="mb-4")
         
@@ -1419,11 +1595,11 @@ Feel free to examine the commit details in the main table for more context."""
                             color="#76B900"
                         )
                     ])
-                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out 0.2s both'})
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out 0.5s both'})
             ], width=12)
         ])
         
-        return html.Div([hotspots_row, extensions_row])
+        return html.Div([time_selector_row, tree_heatmap_row, traditional_charts_row, extensions_row])
     
     def _create_timeline_tab(self, commits_df):
         """Create timeline analysis tab with enhanced animations"""
@@ -1994,6 +2170,253 @@ Feel free to examine the commit details in the main table for more context."""
                 table_data.append(row_data)
         
         return table_data
+    
+    def _create_tree_heatmap(self, files_df):
+        """Create tree heatmap visualization for directory structure and file modification frequency"""
+        # basic validation
+        if files_df.empty:
+            print("⚠️ Tree heatmap: No file data available")
+            return self._create_empty_tree_heatmap()
+        
+        if 'file_path' not in files_df.columns:
+            print("❌ Tree heatmap: file_path column missing")
+            return self._create_empty_tree_heatmap()
+        
+        valid_paths = files_df['file_path'].notna().sum()
+        if valid_paths == 0:
+            print("⚠️ Tree heatmap: No valid file paths found")
+            return self._create_empty_tree_heatmap()
+        
+        print(f"🌳 Tree heatmap: Processing {valid_paths} files for visualization")
+        
+        # build hierarchical data structure
+        hierarchy_data = self._build_file_hierarchy(files_df)
+        
+        if not hierarchy_data or not hierarchy_data.get('values'):
+            print("⚠️ No hierarchy data generated, showing empty heatmap")
+            return self._create_empty_tree_heatmap()
+        
+        # validate data before creating figure
+        values = hierarchy_data['values']
+        max_value = max(values) if values else 1
+        
+        # create treemap figure
+        try:
+            fig = go.Figure(go.Treemap(
+                labels=hierarchy_data['labels'],
+                parents=hierarchy_data['parents'],
+                values=hierarchy_data['values'],
+                ids=hierarchy_data['ids'],
+                text=hierarchy_data['text'],
+                textinfo="label+value+percent parent",
+                textfont_size=10,
+                marker=dict(
+                    colorscale=[
+                        [0.0, '#27AE60'],    # green for low activity
+                        [0.3, '#F1C40F'],    # yellow for medium activity
+                        [0.6, '#E67E22'],    # orange for high activity
+                        [1.0, '#E74C3C']     # red for very high activity
+                    ],
+                    colorbar=dict(
+                        title="Modification Count",
+                        thickness=15,
+                        len=0.7,
+                        tickmode="linear",
+                        tick0=0,
+                        dtick=max(1, max_value // 10) if max_value > 10 else 1,
+                        x=1.02,  # position colorbar to the right
+                        xanchor="left"
+                    ),
+                    cmid=max_value * 0.5 if max_value > 0 else 1,
+                    line=dict(width=1, color='white')
+                ),
+                hovertemplate="<b>%{label}</b><br>" +
+                             "Modifications: %{value}<br>" +
+                             "Percentage: %{percentParent}<br>" +
+                             "<extra></extra>",
+                maxdepth=4,  # limit depth for better visualization
+                branchvalues="total"
+            ))
+            print("✅ Tree heatmap visualization created successfully")
+        except Exception as e:
+            print(f"❌ Error creating treemap figure: {e}")
+            return self._create_empty_tree_heatmap()
+        
+        fig.update_layout(
+            title={
+                'text': "🌳 Directory Tree Heatmap - File Modification Intensity",
+                'x': 0.5,
+                'xanchor': 'center',
+                'font': {'size': 16, 'color': '#000000'}
+            },
+            font=dict(size=11, color='#000000'),
+            margin=dict(t=50, l=10, r=10, b=10),
+            plot_bgcolor='white',
+            paper_bgcolor='white'
+        )
+        
+        return fig
+    
+    def _build_file_hierarchy(self, files_df):
+        """Build hierarchical data structure for treemap visualization"""
+        try:
+            # count modifications per file path
+            file_counts = files_df['file_path'].value_counts()
+            
+            if file_counts.empty:
+                print("❌ No file counts data")
+                return None
+                
+            print(f"🔧 Building tree hierarchy from {len(file_counts)} unique files")
+            
+            # build tree structure
+            hierarchy = {}
+            labels = []
+            parents = []
+            values = []
+            ids = []
+            text = []
+            
+            # add root node
+            root_id = "root"
+            labels.append("🗂️ Project Root")
+            parents.append("")
+            values.append(0)  # will be calculated later
+            ids.append(root_id)
+            text.append(f"Total: {len(files_df)} modifications")
+            
+            # process each file path
+            for file_path, count in file_counts.items():
+                # skip invalid paths
+                if not file_path or pd.isna(file_path) or file_path.strip() == '':
+                    print(f"⚠️ Skipping invalid file path: '{file_path}'")
+                    continue
+                
+                # handle different path separators and normalize
+                normalized_path = file_path.replace('\\', '/')
+                path_parts = [part for part in normalized_path.split('/') if part.strip()]
+                
+                if not path_parts:
+                    print(f"⚠️ No valid path parts for: '{file_path}'")
+                    continue
+                
+                # Uncomment for detailed debugging: print(f"🔧 Processing: {file_path} -> {path_parts} (count: {count})")
+                current_path = ""
+                parent_id = root_id
+                
+                # create directory hierarchy
+                for i, part in enumerate(path_parts):
+                    if i == len(path_parts) - 1:
+                        # this is the file
+                        current_path = file_path
+                        node_id = f"file_{current_path}"
+                        
+                        # determine file icon based on extension
+                        ext = os.path.splitext(part)[1].lower()
+                        if ext in ['.py', '.js', '.ts', '.java', '.cpp', '.c', '.go']:
+                            icon = "📄"
+                        elif ext in ['.html', '.css', '.scss', '.less']:
+                            icon = "🌐"
+                        elif ext in ['.json', '.xml', '.yaml', '.yml']:
+                            icon = "📋"
+                        elif ext in ['.md', '.txt', '.rst']:
+                            icon = "📝"
+                        elif ext in ['.jpg', '.png', '.gif', '.svg']:
+                            icon = "🖼️"
+                        else:
+                            icon = "📄"
+                        
+                        label = f"{icon} {part}"
+                        text_content = f"{part}\nModifications: {count}"
+                    else:
+                        # this is a directory
+                        current_path = '/'.join(path_parts[:i+1]) if current_path else part
+                        node_id = f"dir_{current_path}"
+                        label = f"📁 {part}"
+                        text_content = f"{part}/"
+                    
+                    # check if this node already exists
+                    if node_id not in [id for id in ids]:
+                        labels.append(label)
+                        parents.append(parent_id)
+                        ids.append(node_id)
+                        text.append(text_content)
+                        
+                        if i == len(path_parts) - 1:
+                            # file node gets actual count
+                            values.append(count)
+                        else:
+                            # directory node gets placeholder, will be calculated
+                            values.append(0)
+                    
+                    parent_id = node_id
+            
+            # calculate directory values as sum of children
+            self._calculate_directory_values(labels, parents, values, ids)
+            
+            print(f"✅ Tree hierarchy built: {len(labels)} nodes, {sum(values)} total modifications")
+            
+            return {
+                'labels': labels,
+                'parents': parents,
+                'values': values,
+                'ids': ids,
+                'text': text
+            }
+            
+        except Exception as e:
+            print(f"❌ Error building file hierarchy: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def _calculate_directory_values(self, labels, parents, values, ids):
+        """Calculate directory values as sum of their children"""
+        # create mapping for easier lookup
+        id_to_index = {id_val: idx for idx, id_val in enumerate(ids)}
+        
+        # bottom-up calculation
+        for i in range(len(ids) - 1, -1, -1):
+            current_id = ids[i]
+            if values[i] == 0:  # this is a directory that needs calculation
+                # find all direct children
+                child_sum = 0
+                for j, parent_id in enumerate(parents):
+                    if parent_id == current_id:
+                        child_sum += values[j]
+                values[i] = child_sum
+    
+    def _create_empty_tree_heatmap(self):
+        """Create empty tree heatmap when no data is available"""
+        fig = go.Figure()
+        fig.add_annotation(
+            text="🌳 No file modifications found<br><br>" +
+                 "📅 Try adjusting the time range or filters<br>" +
+                 "🔍 Check if data contains file change information",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, xanchor='center', yanchor='middle',
+            showarrow=False,
+            font=dict(size=14, color="#666666"),
+            bgcolor="rgba(240, 248, 240, 0.8)",
+            bordercolor="#76B900",
+            borderwidth=2,
+            borderpad=20
+        )
+        fig.update_layout(
+            title={
+                'text': "🌳 Directory Tree Heatmap - File Modification Intensity",
+                'x': 0.5,
+                'xanchor': 'center',
+                'font': {'size': 16, 'color': '#000000'}
+            },
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            margin=dict(t=50, l=10, r=10, b=10),
+            height=600
+        )
+        return fig
     
     def _create_author_chart(self, commits_df):
         """Create commits by author chart with dashboard colors"""
