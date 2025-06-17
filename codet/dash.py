@@ -28,12 +28,16 @@ class CodetDashboard:
         self.df_commits = pd.DataFrame()
         self.df_files = pd.DataFrame()
         self.app = None
+        self._json_table_cache = None  # cache for expensive table data processing
         
     def load_data(self):
         """Load and parse JSON data from codet analysis"""
         if not self.json_path:
             print("No JSON path provided")
             return False
+        
+        # clear cache when reloading data
+        self._json_table_cache = None
             
         try:
             # handle different JSON file structures
@@ -708,6 +712,8 @@ class CodetDashboard:
                         transform: translateY(-2px);
                         box-shadow: 0 4px 12px rgba(118, 185, 0, 0.1);
                     }
+                    
+
                 </style>
             </head>
             <body>
@@ -781,9 +787,9 @@ class CodetDashboard:
                             id='author-dropdown',
                             options=[{'label': author, 'value': author} 
                                    for author in sorted(self.df_commits['author'].unique())],
-                            value=list(self.df_commits['author'].unique()) if not self.df_commits.empty else [],
+                            value=[],  # 改为空数组，不默认全选
                             multi=True,
-                            placeholder="Select authors..."
+                            placeholder="All authors selected"  # 显示全选提示
                         )
                     ])
                 ])
@@ -796,9 +802,9 @@ class CodetDashboard:
                             id='repo-dropdown',
                             options=[{'label': repo, 'value': repo} 
                                    for repo in sorted(self.df_commits['repo_name'].unique())],
-                            value=list(self.df_commits['repo_name'].unique()) if not self.df_commits.empty else [],
+                            value=[],  # 改为空数组，不默认全选
                             multi=True,
-                            placeholder="Select repositories..."
+                            placeholder="All repositories selected"  # 显示全选提示
                         )
                     ])
                 ])
@@ -811,9 +817,9 @@ class CodetDashboard:
                             id='filetype-dropdown',
                             options=[{'label': ext if ext else 'No Extension', 'value': ext} 
                                    for ext in sorted(self.df_files['file_ext'].unique())],
-                            value=list(self.df_files['file_ext'].unique()) if not self.df_files.empty else [],
+                            value=[],  # 改为空数组，不默认全选
                             multi=True,
-                            placeholder="Select file types..."
+                            placeholder="All file types selected"  # 显示全选提示
                         )
                     ])
                 ])
@@ -885,12 +891,12 @@ class CodetDashboard:
                 print(f"Selected repos: {selected_repos}")
                 print(f"Selected filetypes: {selected_filetypes}")
                 
-                # ensure selected values are not None
-                if selected_authors is None:
+                # ensure selected values are not None, and default to all if nothing is selected
+                if selected_authors is None or len(selected_authors) == 0:
                     selected_authors = list(self.df_commits['author'].unique()) if not self.df_commits.empty else []
-                if selected_repos is None:
+                if selected_repos is None or len(selected_repos) == 0:
                     selected_repos = list(self.df_commits['repo_name'].unique()) if not self.df_commits.empty else []
-                if selected_filetypes is None:
+                if selected_filetypes is None or len(selected_filetypes) == 0:
                     selected_filetypes = list(self.df_files['file_ext'].unique()) if not self.df_files.empty else []
                 
                 print(f"After defaults - Authors: {len(selected_authors)}, Repos: {len(selected_repos)}, FileTypes: {len(selected_filetypes)}")
@@ -947,6 +953,7 @@ class CodetDashboard:
                 
                 return html.Div(error_content, className="fade-in")
         
+
         # modal callbacks for AI Summary details
         @callback(
             [Output("detail-modal", "is_open"),
@@ -956,7 +963,7 @@ class CodetDashboard:
              Input("close-modal", "n_clicks"),
              Input("close-modal-x", "n_clicks")],
             [State("detail-modal", "is_open"),
-             State("json-data-table", "data")]
+             State("json-data-table", "derived_virtual_data")]
         )
         def toggle_modal(active_cell, close_clicks, close_x_clicks, is_open, table_data):
             ctx = callback_context
@@ -971,6 +978,9 @@ class CodetDashboard:
             if trigger_id == "json-data-table" and active_cell:
                 if active_cell['column_id'] == 'ai_summary':
                     row_index = active_cell['row']
+                    # add safety check for filtered/derived data
+                    if table_data is None or len(table_data) == 0:
+                        return False, "No data available", "AI Analysis Details"
                     if row_index < len(table_data):
                         row_data = table_data[row_index]
                         commit_hash = row_data.get('commit_hash', 'Unknown')
@@ -1560,77 +1570,24 @@ Feel free to examine the commit details in the main table for more context."""
         return details_table
     
     def _create_json_browser_tab(self):
-        """Create JSON browser tab to view raw data"""
+        """Create JSON browser tab to view raw data - optimized for performance"""
         if not self.data:
             return dbc.Alert("No JSON data available.", 
                            style={'backgroundColor': '#f0f8f0', 'color': '#000000', 'border': '2px solid #76B900'})
         
-        # flatten JSON data for table display
-        table_data = []
-        for repo_name, commits in self.data.items():
-            if not isinstance(commits, dict):
-                continue
-                
-            for commit_hash, commit_info in commits.items():
-                if not isinstance(commit_info, dict):
-                    continue
-                
-                # format changed files as numbered list
-                changed_files = commit_info.get('commit_changed_files', [])
-                if changed_files:
-                    files_str = '\n'.join([f"{i+1}. {file}" for i, file in enumerate(changed_files)])
-                else:
-                    files_str = 'No files'
-                
-                # truncate long text fields for better display
-                def truncate_text(text, max_length=100):
-                    if not text:
-                        return ''
-                    return text[:max_length] + '...' if len(text) > max_length else text
-                
-                # special handling for files display - no truncation for files
-                def format_files_display(files_str, max_files=10):
-                    if not files_str or files_str == 'No files':
-                        return files_str
-                    lines = files_str.split('\n')
-                    if len(lines) > max_files:
-                        visible_lines = lines[:max_files]
-                        remaining = len(lines) - max_files
-                        return '\n'.join(visible_lines) + f'\n... and {remaining} more files'
-                    return files_str
-                
-                # format AI summary for better UX - show call-to-action instead of content
-                def format_ai_summary(text, max_display_length=600):
-                    if not text or not text.strip():
-                        return '📝 **No Analysis**\n\n*Click to generate AI insights*'
-                    
-                    # Always show call-to-action for better UX
-                    return '🤖 **View Details**\n\n*Click to view AI analysis*'
-                
-                # create row index for detail viewing
-                row_index = len(table_data)
-                
-                # create MR link if URL exists
-                commit_url = commit_info.get('commit_url', '')
-                mr_link = '[📋 MR](' + commit_url + ')' if commit_url else '🚫 N/A'
-                
-                row_data = {
-                    'repo_name': repo_name,
-                    'commit_hash': commit_hash[:12] + '...',
-                    'full_hash': commit_hash,  # for tooltip
-                    'author': commit_info.get('commit_author', 'Unknown'),
-                    'email': commit_info.get('commit_email', 'Unknown'),
-                    'date': commit_info.get('commit_date', 'Unknown'),
-                    'summary': truncate_text(commit_info.get('commit_summary', ''), 80),
-                    'message': truncate_text(commit_info.get('commit_message', ''), 150),
-                    'changed_files': format_files_display(files_str, 15),  # show more files, numbered
-                    'files_count': len(changed_files),
-                    'mr_link': mr_link,
-                    'ai_summary': format_ai_summary(commit_info.get('ai_summary', ''), 600),
-                    'full_ai_summary': commit_info.get('ai_summary', ''),  # store full summary for modal
-                    'row_index': row_index
-                }
-                table_data.append(row_data)
+        # use cached data if available to avoid expensive reprocessing
+        if self._json_table_cache is None:
+            print("🔄 processing table data for first time...")
+            # show progress for large datasets
+            total_commits = sum(len(commits) if isinstance(commits, dict) else 0 
+                              for commits in self.data.values())
+            if total_commits > 500:
+                print(f"📊 processing {total_commits} commits - this may take a moment...")
+            
+            self._json_table_cache = self._process_json_table_data()
+            print("✅ table data cached successfully")
+        
+        table_data = self._json_table_cache
         
         # create expandable JSON viewer component with dashboard colors
         json_content_section = dbc.Card([
@@ -1682,8 +1639,13 @@ Feel free to examine the commit details in the main table for more context."""
                     ], width=3)
                 ], className="mb-3"),
                 
-                # main data table with horizontal scroll container
-                html.Div([
+                # main data table with horizontal scroll container and loading optimization
+                dcc.Loading(
+                    id="table-loading",
+                    type="dot",
+                    color="#76B900",
+                    children=[
+                        html.Div([
                     dash_table.DataTable(
                     id='json-data-table',
                     data=table_data,
@@ -1752,8 +1714,8 @@ Feel free to examine the commit details in the main table for more context."""
                             'overflow': 'hidden'
                         }
                     ],
-                    # functionality
-                    page_size=100,
+                    # functionality - reduce initial page size for faster rendering
+                    page_size=50,
                     sort_action="native",
                     filter_action="native",
                     row_selectable="multi",
@@ -1829,19 +1791,17 @@ Feel free to examine the commit details in the main table for more context."""
                          'lineHeight': '1.5', 'fontSize': '12px', 'padding': '12px',
                          'overflow': 'auto', 'maxHeight': '200px', 'wordWrap': 'break-word'}
                     ],
-                    # tooltip data for enhanced user experience
+                    # simplified tooltip for better performance - only show for key columns
                     tooltip_data=[
                         {
                             'commit_hash': {'value': f"Full Hash: {row['full_hash']}", 'type': 'text'},
-                            'summary': {'value': f"Full Summary: {row['summary']}", 'type': 'text'},
-                            'message': {'value': f"Complete Message: {row['message']}", 'type': 'text'},
-                            'changed_files': {'value': f"All Changed Files:\n{row['changed_files']}", 'type': 'text'},
-                            'mr_link': {'value': '🔗 Click to open commit in repository', 'type': 'text'},
-                            'ai_summary': {'value': '🤖 Click for comprehensive AI analysis with detailed insights', 'type': 'text'}
+                            'ai_summary': {'value': '🤖 Click for comprehensive AI analysis', 'type': 'text'}
                         } for row in table_data
                     ],
-                    tooltip_duration=None
-                )], style={'overflowX': 'auto', 'width': '100%'}),
+                    tooltip_duration=2000  # shorter tooltip duration for better performance
+                )], style={'overflowX': 'auto', 'width': '100%'})
+                    ]  # close loading children
+                ),  # close loading component
                 
                 # summary statistics
                 html.Hr(),
@@ -1967,6 +1927,73 @@ Feel free to examine the commit details in the main table for more context."""
            style={'borderRadius': '8px', 'overflow': 'hidden'})
         
         return html.Div([json_content_section, modal])
+    
+    def _process_json_table_data(self):
+        """Process JSON data for table display - optimized for performance"""
+        table_data = []
+        
+        # constants for better performance
+        NO_ANALYSIS = '📝 **No Analysis**\n\n*Click to generate AI insights*'
+        VIEW_DETAILS = '🤖 **View Details**\n\n*Click to view AI analysis*'
+        NO_FILES = 'No files'
+        MR_UNAVAILABLE = '🚫 N/A'
+        
+        # batch process data with minimal function calls
+        for repo_name, commits in self.data.items():
+            if not isinstance(commits, dict):
+                continue
+                
+            for commit_hash, commit_info in commits.items():
+                if not isinstance(commit_info, dict):
+                    continue
+                
+                # extract data once
+                changed_files = commit_info.get('commit_changed_files', [])
+                files_count = len(changed_files)
+                commit_url = commit_info.get('commit_url', '')
+                ai_summary_raw = commit_info.get('ai_summary', '')
+                
+                # format changed files efficiently
+                if not changed_files:
+                    formatted_files = NO_FILES
+                elif files_count <= 15:
+                    formatted_files = '\n'.join([f"{i+1}. {file}" for i, file in enumerate(changed_files)])
+                else:
+                    visible_files = changed_files[:15]
+                    remaining = files_count - 15
+                    formatted_files = '\n'.join([f"{i+1}. {file}" for i, file in enumerate(visible_files)])
+                    formatted_files += f'\n... and {remaining} more files'
+                
+                # format text fields efficiently
+                summary = commit_info.get('commit_summary', '')
+                summary = summary[:80] + '...' if len(summary) > 80 else summary
+                
+                message = commit_info.get('commit_message', '')
+                message = message[:150] + '...' if len(message) > 150 else message
+                
+                # format AI summary
+                ai_summary_display = VIEW_DETAILS if ai_summary_raw and ai_summary_raw.strip() else NO_ANALYSIS
+                
+                # create row data with minimal overhead
+                row_data = {
+                    'repo_name': repo_name,
+                    'commit_hash': commit_hash[:12] + '...',
+                    'full_hash': commit_hash,
+                    'author': commit_info.get('commit_author', 'Unknown'),
+                    'email': commit_info.get('commit_email', 'Unknown'),
+                    'date': commit_info.get('commit_date', 'Unknown'),
+                    'summary': summary,
+                    'message': message,
+                    'changed_files': formatted_files,
+                    'files_count': files_count,
+                    'mr_link': f'[📋 MR]({commit_url})' if commit_url else MR_UNAVAILABLE,
+                    'ai_summary': ai_summary_display,
+                    'full_ai_summary': ai_summary_raw,
+                    'row_index': len(table_data)
+                }
+                table_data.append(row_data)
+        
+        return table_data
     
     def _create_author_chart(self, commits_df):
         """Create commits by author chart with dashboard colors"""
