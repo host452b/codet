@@ -895,7 +895,7 @@ class CodetDashboard:
         # add interval for periodic data refresh
         interval = dcc.Interval(
             id='interval-component',
-            interval=60*1000,  # in milliseconds (60 seconds)
+            interval=600*1000,  # in milliseconds (600 seconds)
             n_intervals=0
         )
         
@@ -1129,6 +1129,69 @@ Feel free to examine the commit details in the main table for more context."""
                 traceback.print_exc()
                 # return empty figure on error
                 return self._create_empty_tree_heatmap()
+        
+        # callbacks for timeline analysis
+        @callback(
+            [Output('main-timeline-chart', 'figure'),
+             Output('activity-pattern-chart', 'figure'),
+             Output('trend-analysis-chart', 'figure'),
+             Output('timeline-stats-summary', 'children'),
+             Output('timeline-chart-title', 'children')],
+            [Input('timeline-granularity', 'value'),
+             Input('timeline-groupby', 'value'),
+             Input('timeline-charttype', 'value'),
+             Input('timeline-focus', 'value'),
+             Input('author-dropdown', 'value'),
+             Input('repo-dropdown', 'value'),
+             Input('date-range-picker', 'start_date'),
+             Input('date-range-picker', 'end_date')]
+        )
+        def update_timeline_analysis(granularity, groupby, charttype, focus, 
+                                    selected_authors, selected_repos, start_date, end_date):
+            try:
+                # ensure selected values are not None
+                if selected_authors is None or len(selected_authors) == 0:
+                    selected_authors = list(self.df_commits['author'].unique()) if not self.df_commits.empty else []
+                if selected_repos is None or len(selected_repos) == 0:
+                    selected_repos = list(self.df_commits['repo_name'].unique()) if not self.df_commits.empty else []
+                
+                # get filtered commits data
+                filtered_commits = self._filter_data(start_date, end_date, selected_authors, selected_repos)
+                filtered_files = self._filter_files_data(start_date, end_date, selected_authors, selected_repos, [])
+                
+                if filtered_commits.empty:
+                    empty_fig = self._create_empty_timeline_chart("No data available for timeline analysis")
+                    return empty_fig, empty_fig, empty_fig, "No statistics available", "Timeline Analysis - No Data"
+                
+                # create main timeline chart
+                main_chart = self._create_advanced_timeline_chart(filtered_commits, filtered_files, granularity, groupby, charttype, focus)
+                
+                # create activity pattern chart
+                pattern_chart = self._create_activity_pattern_chart(filtered_commits)
+                
+                # create trend analysis chart
+                trend_chart = self._create_trend_analysis_chart(filtered_commits, granularity)
+                
+                # create statistics summary
+                stats_summary = self._create_timeline_stats_summary(filtered_commits, filtered_files)
+                
+                # update chart title
+                title_mapping = {
+                    'total': 'Overall Activity',
+                    'author': 'Activity by Author',
+                    'repository': 'Activity by Repository',
+                    'filetype': 'Activity by File Type'
+                }
+                chart_title = f"Timeline Analysis - {title_mapping.get(groupby, 'Analysis')}"
+                
+                return main_chart, pattern_chart, trend_chart, stats_summary, chart_title
+                
+            except Exception as e:
+                print(f"❌ Error in timeline analysis: {e}")
+                import traceback
+                traceback.print_exc()
+                empty_fig = self._create_empty_timeline_chart("Error in timeline analysis")
+                return empty_fig, empty_fig, empty_fig, "Error loading statistics", "Timeline Analysis - Error"
     
     def _filter_data(self, start_date, end_date, selected_authors, selected_repos):
         """Filter commits data based on selections"""
@@ -1602,7 +1665,7 @@ Feel free to examine the commit details in the main table for more context."""
         return html.Div([time_selector_row, tree_heatmap_row, traditional_charts_row, extensions_row])
     
     def _create_timeline_tab(self, commits_df):
-        """Create timeline analysis tab with enhanced animations"""
+        """Create comprehensive timeline analysis tab with multiple perspectives"""
         if commits_df.empty:
             return dbc.Alert([
                 html.I(className="fas fa-info-circle", style={'marginRight': '10px'}),
@@ -1615,34 +1678,190 @@ Feel free to examine the commit details in the main table for more context."""
                 'animation': 'slideInUp 0.5s ease-out'
             })
         
-        timeline_chart = dbc.Card([
-            dbc.CardHeader([
-                html.I(className="fas fa-chart-line", style={'marginRight': '10px', 'color': '#76B900'}),
-                "Commit Timeline"
-            ], style={
-                'backgroundColor': '#f0f8f0', 
-                'color': '#000000', 
-                'fontWeight': 'bold', 
-                'border': 'none', 
-                'borderBottom': '3px solid #76B900',
-                'borderRadius': '8px 8px 0 0'
-            }),
-            dbc.CardBody([
-                dcc.Loading(
-                    children=[
-                        dcc.Graph(
-                            figure=self._create_timeline_chart(commits_df),
-                            config={'displayModeBar': True},
-                            style={'animation': 'chartFadeIn 1.2s ease-out'}
-                        )
-                    ],
-                    type="default",
-                    color="#76B900"
-                )
-            ])
-        ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out'})
+        # timeline analysis controls
+        controls_row = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.Label("📊 Timeline Analysis Options", className="fw-bold mb-3"),
+                        dbc.Row([
+                            dbc.Col([
+                                html.Label("⏰ Time Granularity", className="fw-bold mb-2"),
+                                dcc.Dropdown(
+                                    id='timeline-granularity',
+                                    options=[
+                                        {'label': '📅 Daily', 'value': 'daily'},
+                                        {'label': '📆 Weekly', 'value': 'weekly'},
+                                        {'label': '🗓️ Monthly', 'value': 'monthly'},
+                                        {'label': '📋 Quarterly', 'value': 'quarterly'}
+                                    ],
+                                    value='daily',
+                                    placeholder="Select time granularity..."
+                                )
+                            ], width=3),
+                            dbc.Col([
+                                html.Label("👥 Group By", className="fw-bold mb-2"),
+                                dcc.Dropdown(
+                                    id='timeline-groupby',
+                                    options=[
+                                        {'label': '📈 Total Activity', 'value': 'total'},
+                                        {'label': '👨‍💻 By Author', 'value': 'author'},
+                                        {'label': '📁 By Repository', 'value': 'repository'},
+                                        {'label': '📄 By File Type', 'value': 'filetype'}
+                                    ],
+                                    value='total',
+                                    placeholder="Select grouping..."
+                                )
+                            ], width=3),
+                            dbc.Col([
+                                html.Label("📈 Chart Type", className="fw-bold mb-2"),
+                                dcc.Dropdown(
+                                    id='timeline-charttype',
+                                    options=[
+                                        {'label': '📊 Line Chart', 'value': 'line'},
+                                        {'label': '📋 Bar Chart', 'value': 'bar'},
+                                        {'label': '🔥 Heatmap', 'value': 'heatmap'},
+                                        {'label': '📦 Stacked Area', 'value': 'area'}
+                                    ],
+                                    value='line',
+                                    placeholder="Select chart type..."
+                                )
+                            ], width=3),
+                            dbc.Col([
+                                html.Label("🎯 Analysis Focus", className="fw-bold mb-2"),
+                                dcc.Dropdown(
+                                    id='timeline-focus',
+                                    options=[
+                                        {'label': '📝 Commit Count', 'value': 'commits'},
+                                        {'label': '📄 File Changes', 'value': 'files'},
+                                        {'label': '👥 Active Authors', 'value': 'authors'},
+                                        {'label': '⚡ Activity Intensity', 'value': 'intensity'}
+                                    ],
+                                    value='commits',
+                                    placeholder="Select focus metric..."
+                                )
+                            ], width=3)
+                        ])
+                    ])
+                ], style={'borderRadius': '8px', 'marginBottom': '20px'})
+            ], width=12)
+        ])
         
-        return timeline_chart
+        # main timeline chart
+        main_timeline = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader([
+                        html.I(className="fas fa-chart-line", style={'marginRight': '10px', 'color': '#76B900'}),
+                        html.Span("Multi-Dimensional Timeline Analysis", id="timeline-chart-title")
+                    ], style={
+                        'backgroundColor': '#f0f8f0', 
+                        'color': '#000000', 
+                        'fontWeight': 'bold', 
+                        'border': 'none', 
+                        'borderBottom': '3px solid #76B900',
+                        'borderRadius': '8px 8px 0 0'
+                    }),
+                    dbc.CardBody([
+                        dcc.Loading(
+                            children=[
+                                dcc.Graph(
+                                    id="main-timeline-chart",
+                                    config={'displayModeBar': True, 'displaylogo': False},
+                                    style={'height': '500px', 'animation': 'chartFadeIn 1.2s ease-out'}
+                                )
+                            ],
+                            type="default",
+                            color="#76B900"
+                        )
+                    ])
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out'})
+            ], width=12)
+        ], className="mb-4")
+        
+        # additional analysis panels
+        secondary_analysis = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader([
+                        html.I(className="fas fa-clock", style={'marginRight': '10px', 'color': '#e67e22'}),
+                        "Activity Patterns"
+                    ], style={
+                        'backgroundColor': '#f0f8f0', 
+                        'color': '#000000', 
+                        'fontWeight': 'bold', 
+                        'border': 'none', 
+                        'borderBottom': '3px solid #76B900',
+                        'borderRadius': '8px 8px 0 0'
+                    }),
+                    dbc.CardBody([
+                        dcc.Loading(
+                            children=[
+                                dcc.Graph(
+                                    id="activity-pattern-chart",
+                                    config={'displayModeBar': False},
+                                    style={'height': '300px', 'animation': 'chartFadeIn 1.4s ease-out'}
+                                )
+                            ],
+                            type="default",
+                            color="#76B900"
+                        )
+                    ])
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out 0.2s both'})
+            ], width=6),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader([
+                        html.I(className="fas fa-chart-area", style={'marginRight': '10px', 'color': '#3498db'}),
+                        "Trend Analysis"
+                    ], style={
+                        'backgroundColor': '#f0f8f0', 
+                        'color': '#000000', 
+                        'fontWeight': 'bold', 
+                        'border': 'none', 
+                        'borderBottom': '3px solid #76B900',
+                        'borderRadius': '8px 8px 0 0'
+                    }),
+                    dbc.CardBody([
+                        dcc.Loading(
+                            children=[
+                                dcc.Graph(
+                                    id="trend-analysis-chart",
+                                    config={'displayModeBar': False},
+                                    style={'height': '300px', 'animation': 'chartFadeIn 1.6s ease-out'}
+                                )
+                            ],
+                            type="default",
+                            color="#76B900"
+                        )
+                    ])
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out 0.3s both'})
+            ], width=6)
+        ], className="mb-4")
+        
+        # statistics summary
+        stats_summary = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader([
+                        html.I(className="fas fa-chart-bar", style={'marginRight': '10px', 'color': '#9b59b6'}),
+                        "Timeline Statistics"
+                    ], style={
+                        'backgroundColor': '#f0f8f0', 
+                        'color': '#000000', 
+                        'fontWeight': 'bold', 
+                        'border': 'none', 
+                        'borderBottom': '3px solid #76B900',
+                        'borderRadius': '8px 8px 0 0'
+                    }),
+                    dbc.CardBody([
+                        html.Div(id="timeline-stats-summary", style={'animation': 'fadeIn 1.8s ease-out'})
+                    ])
+                ], style={'borderRadius': '8px', 'animation': 'slideInUp 0.8s ease-out 0.4s both'})
+            ], width=12)
+        ])
+        
+        return html.Div([controls_row, main_timeline, secondary_analysis, stats_summary])
     
     def _create_details_tab(self, commits_df):
         """Create detailed commits table tab with enhanced animations"""
@@ -2571,6 +2790,460 @@ Feel free to examine the commit details in the main table for more context."""
         fig.update_xaxes(gridcolor='#cccccc', zerolinecolor='#cccccc')
         fig.update_yaxes(gridcolor='#cccccc', zerolinecolor='#cccccc')
         fig.update_traces(line=dict(color='#76B900', width=3))
+        return fig
+    
+    def _create_advanced_timeline_chart(self, commits_df, files_df, granularity, groupby, charttype, focus):
+        """Create advanced timeline chart with multiple analysis dimensions"""
+        if commits_df.empty:
+            return self._create_empty_timeline_chart("No commit data available")
+        
+        # prepare data based on granularity
+        time_data = self._prepare_timeline_data(commits_df, files_df, granularity, groupby, focus)
+        
+        if time_data.empty:
+            return self._create_empty_timeline_chart("No data for selected parameters")
+        
+        # create chart based on type and grouping
+        if charttype == 'line':
+            return self._create_timeline_line_chart(time_data, groupby, focus, granularity)
+        elif charttype == 'bar':
+            return self._create_timeline_bar_chart(time_data, groupby, focus, granularity)
+        elif charttype == 'heatmap':
+            return self._create_timeline_heatmap(time_data, groupby, focus, granularity)
+        elif charttype == 'area':
+            return self._create_timeline_area_chart(time_data, groupby, focus, granularity)
+        else:
+            return self._create_timeline_line_chart(time_data, groupby, focus, granularity)
+    
+    def _prepare_timeline_data(self, commits_df, files_df, granularity, groupby, focus):
+        """Prepare timeline data based on analysis parameters"""
+        df = commits_df.copy()
+        
+        # ensure date column is datetime
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df = df.dropna(subset=['date'])
+        
+        if df.empty:
+            return pd.DataFrame()
+        
+        # create time grouping based on granularity
+        if granularity == 'daily':
+            df['time_period'] = df['date'].dt.date
+            period_format = '%Y-%m-%d'
+        elif granularity == 'weekly':
+            df['time_period'] = df['date'].dt.to_period('W').dt.start_time
+            period_format = '%Y-W%U'
+        elif granularity == 'monthly':
+            df['time_period'] = df['date'].dt.to_period('M').dt.start_time
+            period_format = '%Y-%m'
+        elif granularity == 'quarterly':
+            df['time_period'] = df['date'].dt.to_period('Q').dt.start_time
+            period_format = '%Y-Q%q'
+        else:
+            df['time_period'] = df['date'].dt.date
+            period_format = '%Y-%m-%d'
+        
+        # group data based on focus and groupby parameters
+        if focus == 'commits':
+            if groupby == 'total':
+                result = df.groupby('time_period').size().reset_index(name='value')
+                result['category'] = 'Total Commits'
+            elif groupby == 'author':
+                result = df.groupby(['time_period', 'author']).size().reset_index(name='value')
+                result['category'] = result['author']
+            elif groupby == 'repository':
+                result = df.groupby(['time_period', 'repo_name']).size().reset_index(name='value')
+                result['category'] = result['repo_name']
+            else:  # filetype
+                if not files_df.empty:
+                    files_df['date'] = pd.to_datetime(files_df['date'], errors='coerce')
+                    files_df['time_period'] = files_df['date'].dt.date
+                    if granularity == 'weekly':
+                        files_df['time_period'] = files_df['date'].dt.to_period('W').dt.start_time
+                    elif granularity == 'monthly':
+                        files_df['time_period'] = files_df['date'].dt.to_period('M').dt.start_time
+                    elif granularity == 'quarterly':
+                        files_df['time_period'] = files_df['date'].dt.to_period('Q').dt.start_time
+                    result = files_df.groupby(['time_period', 'file_ext']).size().reset_index(name='value')
+                    result['category'] = result['file_ext'].apply(lambda x: x if x else 'No Extension')
+                else:
+                    return pd.DataFrame()
+        
+        elif focus == 'files':
+            if not files_df.empty:
+                files_df['date'] = pd.to_datetime(files_df['date'], errors='coerce')
+                files_df['time_period'] = files_df['date'].dt.date
+                if granularity == 'weekly':
+                    files_df['time_period'] = files_df['date'].dt.to_period('W').dt.start_time
+                elif granularity == 'monthly':
+                    files_df['time_period'] = files_df['date'].dt.to_period('M').dt.start_time
+                elif granularity == 'quarterly':
+                    files_df['time_period'] = files_df['date'].dt.to_period('Q').dt.start_time
+                
+                if groupby == 'total':
+                    result = files_df.groupby('time_period').size().reset_index(name='value')
+                    result['category'] = 'Total File Changes'
+                elif groupby == 'filetype':
+                    result = files_df.groupby(['time_period', 'file_ext']).size().reset_index(name='value')
+                    result['category'] = result['file_ext'].apply(lambda x: x if x else 'No Extension')
+                else:
+                    result = files_df.groupby(['time_period', 'author']).size().reset_index(name='value')
+                    result['category'] = result['author']
+            else:
+                return pd.DataFrame()
+        
+        elif focus == 'authors':
+            if groupby == 'total':
+                result = df.groupby('time_period')['author'].nunique().reset_index(name='value')
+                result['category'] = 'Active Authors'
+            else:
+                result = df.groupby(['time_period', 'author']).size().reset_index(name='value')
+                result['category'] = result['author']
+        
+        else:  # intensity
+            # calculate activity intensity (commits per author per day)
+            intensity = df.groupby(['time_period', 'author']).size().reset_index(name='commits')
+            intensity = intensity.groupby('time_period')['commits'].mean().reset_index(name='value')
+            intensity['category'] = 'Activity Intensity'
+            result = intensity
+        
+        return result
+    
+    def _create_timeline_line_chart(self, data, groupby, focus, granularity):
+        """Create line chart for timeline data"""
+        fig = go.Figure()
+        
+        if groupby == 'total' or len(data['category'].unique()) == 1:
+            fig.add_trace(go.Scatter(
+                x=data['time_period'],
+                y=data['value'],
+                mode='lines+markers',
+                name=data['category'].iloc[0] if not data.empty else 'Data',
+                line=dict(color='#76B900', width=3),
+                marker=dict(size=6, color='#76B900')
+            ))
+        else:
+            colors = px.colors.qualitative.Set3
+            for i, category in enumerate(data['category'].unique()):
+                category_data = data[data['category'] == category]
+                fig.add_trace(go.Scatter(
+                    x=category_data['time_period'],
+                    y=category_data['value'],
+                    mode='lines+markers',
+                    name=str(category),
+                    line=dict(width=2, color=colors[i % len(colors)]),
+                    marker=dict(size=4)
+                ))
+        
+        fig.update_layout(
+            title=f"{focus.title()} Timeline ({granularity.title()})",
+            xaxis_title="Time Period",
+            yaxis_title=focus.title(),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            hovermode='x unified'
+        )
+        
+        return fig
+    
+    def _create_timeline_bar_chart(self, data, groupby, focus, granularity):
+        """Create bar chart for timeline data"""
+        if groupby == 'total' or len(data['category'].unique()) == 1:
+            fig = px.bar(data, x='time_period', y='value', 
+                        title=f"{focus.title()} Timeline ({granularity.title()})",
+                        color_discrete_sequence=['#76B900'])
+        else:
+            fig = px.bar(data, x='time_period', y='value', color='category',
+                        title=f"{focus.title()} by {groupby.title()} ({granularity.title()})",
+                        color_discrete_sequence=px.colors.qualitative.Set3)
+        
+        fig.update_layout(
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            xaxis_title="Time Period",
+            yaxis_title=focus.title()
+        )
+        
+        return fig
+    
+    def _create_timeline_heatmap(self, data, groupby, focus, granularity):
+        """Create heatmap for timeline data"""
+        if groupby == 'total':
+            # create day-of-week vs time heatmap
+            return self._create_calendar_heatmap(data, focus)
+        
+        # pivot data for heatmap
+        pivot_data = data.pivot(index='category', columns='time_period', values='value').fillna(0)
+        
+        fig = go.Figure(data=go.Heatmap(
+            z=pivot_data.values,
+            x=pivot_data.columns,
+            y=pivot_data.index,
+            colorscale=[
+                [0.0, '#f8f9fa'],
+                [0.2, '#c8e6c9'],
+                [0.4, '#a5d6a7'],
+                [0.6, '#81c784'],
+                [0.8, '#66bb6a'],
+                [1.0, '#4caf50']
+            ],
+            hovertemplate='<b>%{y}</b><br>%{x}<br>Count: %{z}<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            title=f"{focus.title()} Heatmap by {groupby.title()}",
+            xaxis_title="Time Period",
+            yaxis_title=groupby.title(),
+            plot_bgcolor='white',
+            paper_bgcolor='white'
+        )
+        
+        return fig
+    
+    def _create_timeline_area_chart(self, data, groupby, focus, granularity):
+        """Create stacked area chart for timeline data"""
+        if groupby == 'total':
+            fig = px.area(data, x='time_period', y='value',
+                         title=f"{focus.title()} Timeline ({granularity.title()})",
+                         color_discrete_sequence=['#76B900'])
+        else:
+            # create stacked area chart
+            pivot_data = data.pivot(index='time_period', columns='category', values='value').fillna(0)
+            
+            fig = go.Figure()
+            colors = px.colors.qualitative.Set3
+            
+            for i, category in enumerate(pivot_data.columns):
+                fig.add_trace(go.Scatter(
+                    x=pivot_data.index,
+                    y=pivot_data[category],
+                    mode='lines',
+                    name=str(category),
+                    fill='tonexty' if i > 0 else 'tozeroy',
+                    line=dict(width=0.5, color=colors[i % len(colors)]),
+                    fillcolor=colors[i % len(colors)]
+                ))
+        
+        fig.update_layout(
+            title=f"{focus.title()} Stacked Timeline ({granularity.title()})",
+            xaxis_title="Time Period",
+            yaxis_title=focus.title(),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            hovermode='x unified'
+        )
+        
+        return fig
+    
+    def _create_calendar_heatmap(self, data, focus):
+        """Create calendar-style heatmap"""
+        # This is a simplified version - could be enhanced with actual calendar layout
+        fig = go.Figure(data=go.Scatter(
+            x=data['time_period'],
+            y=data['value'],
+            mode='markers',
+            marker=dict(
+                size=data['value'] * 2,
+                color=data['value'],
+                colorscale='Greens',
+                showscale=True
+            )
+        ))
+        
+        fig.update_layout(
+            title=f"Calendar View - {focus.title()}",
+            xaxis_title="Date",
+            yaxis_title=focus.title(),
+            plot_bgcolor='white',
+            paper_bgcolor='white'
+        )
+        
+        return fig
+    
+    def _create_activity_pattern_chart(self, commits_df):
+        """Create activity pattern analysis chart"""
+        if commits_df.empty:
+            return self._create_empty_timeline_chart("No data for activity patterns")
+        
+        df = commits_df.copy()
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df = df.dropna(subset=['date'])
+        
+        if df.empty:
+            return self._create_empty_timeline_chart("No valid dates for pattern analysis")
+        
+        # analyze day of week patterns
+        df['day_of_week'] = df['date'].dt.day_name()
+        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        day_counts = df['day_of_week'].value_counts().reindex(day_order, fill_value=0)
+        
+        fig = px.bar(
+            x=day_counts.index,
+            y=day_counts.values,
+            title="Commit Activity by Day of Week",
+            color=day_counts.values,
+            color_continuous_scale='Greens'
+        )
+        
+        fig.update_layout(
+            xaxis_title="Day of Week",
+            yaxis_title="Number of Commits",
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            showlegend=False
+        )
+        
+        return fig
+    
+    def _create_trend_analysis_chart(self, commits_df, granularity):
+        """Create trend analysis with moving averages"""
+        if commits_df.empty:
+            return self._create_empty_timeline_chart("No data for trend analysis")
+        
+        df = commits_df.copy()
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df = df.dropna(subset=['date'])
+        
+        if df.empty:
+            return self._create_empty_timeline_chart("No valid dates for trend analysis")
+        
+        # group by time period
+        if granularity == 'weekly':
+            df['period'] = df['date'].dt.to_period('W').dt.start_time
+            window = 4  # 4-week moving average
+        elif granularity == 'monthly':
+            df['period'] = df['date'].dt.to_period('M').dt.start_time
+            window = 3  # 3-month moving average
+        else:
+            df['period'] = df['date'].dt.date
+            window = 7  # 7-day moving average
+        
+        daily_counts = df.groupby('period').size().reset_index(name='commits')
+        daily_counts['moving_avg'] = daily_counts['commits'].rolling(window=window, center=True).mean()
+        
+        fig = go.Figure()
+        
+        # actual data
+        fig.add_trace(go.Scatter(
+            x=daily_counts['period'],
+            y=daily_counts['commits'],
+            mode='lines+markers',
+            name='Actual',
+            line=dict(color='#76B900', width=2),
+            marker=dict(size=4)
+        ))
+        
+        # moving average
+        fig.add_trace(go.Scatter(
+            x=daily_counts['period'],
+            y=daily_counts['moving_avg'],
+            mode='lines',
+            name=f'{window}-period Moving Average',
+            line=dict(color='#FF6B6B', width=3, dash='dash')
+        ))
+        
+        fig.update_layout(
+            title=f"Commit Trend Analysis ({granularity.title()})",
+            xaxis_title="Time Period",
+            yaxis_title="Number of Commits",
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            hovermode='x unified'
+        )
+        
+        return fig
+    
+    def _create_timeline_stats_summary(self, commits_df, files_df):
+        """Create timeline statistics summary"""
+        if commits_df.empty:
+            return html.Div("No data available for statistics", className="text-muted")
+        
+        # calculate key metrics
+        total_commits = len(commits_df)
+        total_authors = commits_df['author'].nunique()
+        total_repos = commits_df['repo_name'].nunique()
+        total_files = len(files_df) if not files_df.empty else 0
+        
+        # date range
+        commits_df['date'] = pd.to_datetime(commits_df['date'], errors='coerce')
+        valid_dates = commits_df['date'].dropna()
+        if not valid_dates.empty:
+            date_range = f"{valid_dates.min().strftime('%Y-%m-%d')} to {valid_dates.max().strftime('%Y-%m-%d')}"
+            days_span = (valid_dates.max() - valid_dates.min()).days + 1
+            avg_commits_per_day = total_commits / days_span if days_span > 0 else 0
+        else:
+            date_range = "No valid dates"
+            avg_commits_per_day = 0
+        
+        # most active author
+        if total_authors > 0:
+            most_active_author = commits_df['author'].value_counts().index[0]
+            most_active_count = commits_df['author'].value_counts().iloc[0]
+        else:
+            most_active_author = "Unknown"
+            most_active_count = 0
+        
+        # peak activity day
+        if not valid_dates.empty:
+            daily_activity = commits_df.groupby(valid_dates.dt.date).size()
+            peak_day = daily_activity.idxmax()
+            peak_count = daily_activity.max()
+        else:
+            peak_day = "Unknown"
+            peak_count = 0
+        
+        return dbc.Row([
+            dbc.Col([
+                html.H6("📊 Overview", className="fw-bold text-primary mb-3"),
+                html.P(f"📝 Total Commits: {total_commits:,}", className="mb-1"),
+                html.P(f"👥 Active Authors: {total_authors}", className="mb-1"),
+                html.P(f"📁 Repositories: {total_repos}", className="mb-1"),
+                html.P(f"📄 File Changes: {total_files:,}", className="mb-1"),
+            ], width=3),
+            dbc.Col([
+                html.H6("📅 Time Analysis", className="fw-bold text-success mb-3"),
+                html.P(f"📆 Date Range: {date_range}", className="mb-1"),
+                html.P(f"⚡ Avg Commits/Day: {avg_commits_per_day:.1f}", className="mb-1"),
+                html.P(f"🔥 Peak Day: {peak_day}", className="mb-1"),
+                html.P(f"📈 Peak Activity: {peak_count} commits", className="mb-1"),
+            ], width=3),
+            dbc.Col([
+                html.H6("🏆 Top Contributors", className="fw-bold text-warning mb-3"),
+                html.P(f"👑 Most Active: {most_active_author}", className="mb-1"),
+                html.P(f"🎯 Commit Count: {most_active_count}", className="mb-1"),
+                html.P(f"📊 Contribution: {(most_active_count/total_commits*100):.1f}%", className="mb-1"),
+            ], width=3),
+            dbc.Col([
+                html.H6("📈 Activity Insights", className="fw-bold text-info mb-3"),
+                html.P("🔍 Analysis includes all filtered data", className="mb-1"),
+                html.P("📊 Use controls above to explore different views", className="mb-1"),
+                html.P("🎯 Hover charts for detailed information", className="mb-1"),
+            ], width=3)
+        ])
+    
+    def _create_empty_timeline_chart(self, message="No data available"):
+        """Create empty timeline chart with message"""
+        fig = go.Figure()
+        fig.add_annotation(
+            text=f"📈 {message}<br><br>🔍 Try adjusting filters or date range",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, xanchor='center', yanchor='middle',
+            showarrow=False,
+            font=dict(size=14, color="#666666"),
+            bgcolor="rgba(240, 248, 240, 0.8)",
+            bordercolor="#76B900",
+            borderwidth=2,
+            borderpad=20
+        )
+        fig.update_layout(
+            title="Timeline Analysis",
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            margin=dict(t=50, l=10, r=10, b=10),
+            height=400
+        )
         return fig
     
     def _create_loading_skeleton(self, component_type="card"):
