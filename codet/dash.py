@@ -9,6 +9,7 @@ import os
 import json
 import argparse
 import pandas as pd
+import re
 from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
@@ -2055,6 +2056,7 @@ Feel free to examine the commit details in the main table for more context."""
                         {'name': 'Changed Files', 'id': 'changed_files', 'type': 'text'},
                         {'name': 'Files #', 'id': 'files_count', 'type': 'numeric'},
                         {'name': 'MR', 'id': 'mr_link', 'type': 'text', 'presentation': 'markdown'},
+                        {'name': 'JIRA', 'id': 'jira_links', 'type': 'text', 'presentation': 'markdown'},
                         {'name': 'AI Summary', 'id': 'ai_summary', 'type': 'text', 'presentation': 'markdown'}
                     ],
                     # styling with unified font size
@@ -2093,6 +2095,14 @@ Feel free to examine the commit details in the main table for more context."""
                             'textDecoration': 'underline',
                             'fontWeight': 'bold',
                             'transition': 'all 0.2s ease-in-out'
+                        },
+                        {
+                            'if': {'column_id': 'jira_links'},
+                            'color': '#000000',           # dashboard black for JIRA links
+                            'textDecoration': 'underline',
+                            'fontWeight': 'bold',
+                            'transition': 'all 0.2s ease-in-out',
+                            'textAlign': 'center'
                         },
                         {
                             'if': {'column_id': 'ai_summary'},
@@ -2152,6 +2162,15 @@ Feel free to examine the commit details in the main table for more context."""
                             '''
                         },
                         {
+                            'selector': '.dash-table-container .dash-cell[data-dash-column="jira_links"]:hover',
+                            'rule': '''
+                                color: #333333 !important;
+                                transform: scale(1.05) !important;
+                                transition: all 0.2s ease-in-out !important;
+                                background-color: rgba(0, 0, 0, 0.05) !important;
+                            '''
+                        },
+                        {
                             'selector': '.dash-table-container .dash-cell:hover',
                             'rule': '''
                                 background-color: rgba(118, 185, 0, 0.05) !important;
@@ -2170,18 +2189,20 @@ Feel free to examine the commit details in the main table for more context."""
                     ],
                     # responsive column widths with emphasis on AI Summary
                     style_cell_conditional=[
-                        {'if': {'column_id': 'repo_name'}, 'width': '8%', 'minWidth': '80px'},
-                        {'if': {'column_id': 'commit_hash'}, 'width': '6%', 'minWidth': '70px'},
-                        {'if': {'column_id': 'author'}, 'width': '8%', 'minWidth': '80px'},
-                        {'if': {'column_id': 'email'}, 'width': '10%', 'minWidth': '120px'},
-                        {'if': {'column_id': 'date'}, 'width': '8%', 'minWidth': '100px'},
-                        {'if': {'column_id': 'summary'}, 'width': '12%', 'minWidth': '120px'},
-                        {'if': {'column_id': 'message'}, 'width': '15%', 'minWidth': '150px'},
-                        {'if': {'column_id': 'changed_files'}, 'width': '15%', 'minWidth': '200px', 
+                        {'if': {'column_id': 'repo_name'}, 'width': '7%', 'minWidth': '80px'},
+                        {'if': {'column_id': 'commit_hash'}, 'width': '5%', 'minWidth': '70px'},
+                        {'if': {'column_id': 'author'}, 'width': '7%', 'minWidth': '80px'},
+                        {'if': {'column_id': 'email'}, 'width': '9%', 'minWidth': '120px'},
+                        {'if': {'column_id': 'date'}, 'width': '7%', 'minWidth': '100px'},
+                        {'if': {'column_id': 'summary'}, 'width': '11%', 'minWidth': '120px'},
+                        {'if': {'column_id': 'message'}, 'width': '13%', 'minWidth': '150px'},
+                        {'if': {'column_id': 'changed_files'}, 'width': '13%', 'minWidth': '200px', 
                          'whiteSpace': 'pre-line', 'fontFamily': 'system-ui, -apple-system, sans-serif', 'fontSize': '12px'},
                         {'if': {'column_id': 'files_count'}, 'width': '3%', 'minWidth': '50px', 'textAlign': 'center'},
-                        {'if': {'column_id': 'mr_link'}, 'width': '5%', 'minWidth': '60px', 'textAlign': 'center'},
-                        {'if': {'column_id': 'ai_summary'}, 'width': '37%', 'minWidth': '450px', 'maxWidth': '500px',
+                        {'if': {'column_id': 'mr_link'}, 'width': '4%', 'minWidth': '60px', 'textAlign': 'center'},
+                        {'if': {'column_id': 'jira_links'}, 'width': '6%', 'minWidth': '80px', 'textAlign': 'center',
+                         'whiteSpace': 'pre-line', 'fontFamily': 'system-ui, -apple-system, sans-serif', 'fontSize': '12px'},
+                        {'if': {'column_id': 'ai_summary'}, 'width': '35%', 'minWidth': '450px', 'maxWidth': '500px',
                          'whiteSpace': 'pre-wrap', 'fontFamily': 'system-ui, -apple-system, sans-serif', 
                          'lineHeight': '1.5', 'fontSize': '12px', 'padding': '12px',
                          'overflow': 'auto', 'maxHeight': '200px', 'wordWrap': 'break-word'}
@@ -2369,6 +2390,29 @@ Feel free to examine the commit details in the main table for more context."""
                 # format AI summary
                 ai_summary_display = VIEW_DETAILS if ai_summary_raw and ai_summary_raw.strip() else NO_ANALYSIS
                 
+                # extract JIRA ticket IDs - pattern: uppercase letters followed by dash and numbers
+                jira_pattern = r'[A-Z]+-\d+'
+                jira_links = []
+                
+                # search for JIRA IDs in commit summary and message
+                commit_summary = commit_info.get('commit_summary', '')
+                commit_message = commit_info.get('commit_message', '')
+                all_text = f"{commit_summary} {commit_message}"
+                
+                jira_matches = re.findall(jira_pattern, all_text)
+                if jira_matches:
+                    # remove duplicates while preserving order
+                    unique_jira_ids = list(dict.fromkeys(jira_matches))
+                    for jira_id in unique_jira_ids:
+                        jira_url = f"https://jirasw.nvidia.com/browse/{jira_id}"
+                        jira_links.append(f"[{jira_id}]({jira_url})")
+                
+                # format JIRA links display
+                if jira_links:
+                    jira_display = '\n'.join(jira_links)
+                else:
+                    jira_display = '🚫 N/A'
+                
                 # create row data with minimal overhead
                 row_data = {
                     'repo_name': repo_name,
@@ -2382,6 +2426,7 @@ Feel free to examine the commit details in the main table for more context."""
                     'changed_files': formatted_files,
                     'files_count': files_count,
                     'mr_link': f'[📋 MR]({commit_url})' if commit_url else MR_UNAVAILABLE,
+                    'jira_links': jira_display,
                     'ai_summary': ai_summary_display,
                     'full_ai_summary': ai_summary_raw,
                     'row_index': len(table_data)
