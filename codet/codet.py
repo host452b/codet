@@ -113,7 +113,7 @@ class CodeTrailExecutor:
         # Check conditions (union mode vs intersection mode)
         # Default is union mode (match any condition)
         # Search mode explanation:
-        # 1. Union Mode: Include commit if it matches ANY filter condition (email, username or keyword)
+        # 1. Union Mode: Include commit if it matches ANY filter condition (email, username, keyword or commit hash)
         #    Example: If email A and keyword B specified, include commits with email A OR containing keyword B
         # 2. Intersection Mode: Include commit only if it matches ALL specified filter conditions
         #    Example: If email A and keyword B specified, include commits only with email A AND containing keyword B
@@ -123,16 +123,18 @@ class CodeTrailExecutor:
         union_mode = self.args.mode == "union"  # Check mode based on args.mode
         if union_mode:
             self.logger.info("[Search Mode] Using Union Mode - Match any condition")
-            self.logger.info("  Union mode: commit included if it matches any email, username or keyword condition")
+            self.logger.info("  Union mode: commit included if it matches any email, username, keyword or commit hash condition")
             self.logger.info(f"  - Email conditions: {', '.join(self.args.email) if self.args.email else 'none'}")
             self.logger.info(f"  - User conditions: {', '.join(self.args.user) if self.args.user else 'none'}")
             self.logger.info(f"  - Keyword conditions: {', '.join(self.args.keyword) if self.args.keyword else 'none'}")
+            self.logger.info(f"  - Commit hash conditions: {', '.join(self.args.commit) if self.args.commit else 'none'}")
         else:
             self.logger.info("[Search Mode] Using Intersection Mode - Must match all conditions")
             self.logger.info("  Intersection mode: commit included only if it matches all specified conditions")
             self.logger.info(f"  - Email conditions: {', '.join(self.args.email) if self.args.email else 'none'} (must match if specified)")
             self.logger.info(f"  - User conditions: {', '.join(self.args.user) if self.args.user else 'none'} (must match if specified)")
             self.logger.info(f"  - Keyword conditions: {', '.join(self.args.keyword) if self.args.keyword else 'none'} (must match if specified)")
+            self.logger.info(f"  - Commit hash conditions: {', '.join(self.args.commit) if self.args.commit else 'none'} (must match if specified)")
 
         
         # Iterate through commits in all repos
@@ -144,7 +146,8 @@ class CodeTrailExecutor:
                 # Include all commits if no filters specified
                 if (not self.args.email or len(self.args.email) == 0) and \
                    (not self.args.user or len(self.args.user) == 0) and \
-                   (not self.args.keyword or len(self.args.keyword) == 0):
+                   (not self.args.keyword or len(self.args.keyword) == 0) and \
+                   (not self.args.commit or len(self.args.commit) == 0):
                     self.cooked_commits[repo_name][commit_hash] = commit_data
                     continue
 
@@ -171,6 +174,16 @@ class CodeTrailExecutor:
                                 should_include = True
                                 break
                     
+                    # Filter by commit hash (match any hash - support partial matching)
+                    if not should_include and self.args.commit and len(self.args.commit) > 0:
+                        # Check if any provided hash matches (partial or full)
+                        for provided_hash in self.args.commit:
+                            # support partial hash matching - check if provided hash is prefix of actual hash
+                            if commit_hash.lower().startswith(provided_hash.lower()) or \
+                               commit_data.get("commit_hash", "").lower().startswith(provided_hash.lower()):
+                                should_include = True
+                                break
+                    
                     # Add to processed data if matches any condition
                     if should_include:
                         self.cooked_commits[repo_name][commit_hash] = commit_data
@@ -183,6 +196,7 @@ class CodeTrailExecutor:
                     has_email_filter = self.args.email and len(self.args.email) > 0
                     has_user_filter = self.args.user and len(self.args.user) > 0
                     has_keyword_filter = self.args.keyword and len(self.args.keyword) > 0
+                    has_commit_filter = self.args.commit and len(self.args.commit) > 0
                     
                     # Filter by author email (must match all emails)
                     if has_email_filter:
@@ -204,6 +218,15 @@ class CodeTrailExecutor:
                         commit_text_lower = commit_text.lower()
                         for keyword in self.args.keyword:
                             if keyword.lower() not in commit_text_lower:
+                                should_include = False
+                                break
+                    
+                    # Filter by commit hash (must match all provided hashes - support partial matching)
+                    if has_commit_filter and should_include:
+                        for provided_hash in self.args.commit:
+                            # support partial hash matching - check if provided hash is prefix of actual hash
+                            if not (commit_hash.lower().startswith(provided_hash.lower()) or \
+                                   commit_data.get("commit_hash", "").lower().startswith(provided_hash.lower())):
                                 should_include = False
                                 break
                     
