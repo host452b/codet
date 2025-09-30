@@ -123,6 +123,14 @@ def main():
         help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} Search for keywords in commit diffs, can be used multiple times (e.g., -k keyword1 -k keyword2)"
     )
     parser.add_argument(
+        "-c",
+        "--commit",
+        type=str,
+        action="append",
+        default=[],
+        help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} Filter by specific commit hash (string, can use multiple -c)"
+    )
+    parser.add_argument(
         "-g",
         "--debug",
         action="store_true",
