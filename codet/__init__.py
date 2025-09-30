@@ -11,4 +11,4 @@ In particular, the generated git diff files can be conveniently integrated with 
 - Code hotspot analysis to identify frequently modified areas.
 """
 
-__version__ = "1.0.5" 
+__version__ = "1.0.6" 
