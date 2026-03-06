@@ -11,7 +11,7 @@ pip install codet
 1. 克隆仓库
 
 ```bash
-git clone https://github.com/yourusername/codet.git
+git clone https://github.com/host452b/codet.git
 cd codet
 ```
 

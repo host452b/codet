@@ -23,7 +23,7 @@ jobs:
       - name: Install build tools
         run: |
           python -m pip install --upgrade pip
-          pip install build twine
+          pip install build
 
       - name: Extract version from tag
         id: tag
@@ -50,10 +50,3 @@ jobs:
           gh release create "$tag" dist/* \
             --title "codet $tag" \
             --generate-notes
-
-      - name: Publish to PyPI
-        if: ${{ secrets.PYPI_API_TOKEN != '' }}
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: python -m twine upload dist/* --skip-existing

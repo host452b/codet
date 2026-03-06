@@ -2404,7 +2404,7 @@ Feel free to examine the commit details in the main table for more context."""
                     # remove duplicates while preserving order
                     unique_jira_ids = list(dict.fromkeys(jira_matches))
                     for jira_id in unique_jira_ids:
-                        jira_url = f"https://jirasw.nvidia.com/browse/{jira_id}"
+                        jira_url = f"https://jira.example.com/browse/{jira_id}"
                         jira_links.append(f"[{jira_id}]({jira_url})")
                 
                 # format JIRA links display
