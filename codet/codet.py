@@ -1,9 +1,6 @@
 import os
-import sys
-import re
 import json
 import datetime
-from typing import List, Dict, Any, Optional
 from codet.git_compoent import GitAnalyzer
 from collections import OrderedDict
 from tqdm import tqdm
@@ -51,10 +48,8 @@ class CodeTrailExecutor:
             # Recursive mode: scan all subdirectories for Git repos
             self.logger.info("Recursive mode enabled, scanning all subdirectories")
             
-            # Use os.walk to recursively scan directories
             for root, dirs, _ in os.walk(self.args.path):
-                # Only add directories containing .git
-                if '.git' in os.listdir(root):
+                if os.path.isdir(os.path.join(root, '.git')):
                     dir_path_list.append(root)
         else:
             # Non-recursive mode: only analyze specified directory
@@ -409,6 +404,19 @@ class CodeTrailExecutor:
         self.logger.info("\n" + str(table))
         self.logger.info("\nHotspot analysis complete")
 
+    def _get_input_file_content(self):
+        """read and cache input file content (file handle can only be read once)"""
+        if not hasattr(self, '_input_file_cache'):
+            self._input_file_cache = None
+            input_file = self.args.input_file
+            if input_file:
+                try:
+                    self._input_file_cache = input_file.read()
+                    input_file.close()
+                except Exception as e:
+                    self.logger.error(f"Failed to read input file: {str(e)}")
+        return self._input_file_cache
+
     def ai_analysis(self, text_input):
         from openai import OpenAI
 
@@ -416,23 +424,16 @@ class CodeTrailExecutor:
         endpoint = self.args.openai_endpoint
         llm_model = self.args.model
         custom_prompt = self.args.custom_prompt
-        input_file = self.args.input_file
 
         if custom_prompt:
-            print(f"===> CUSTOM PROMPT MESSAGE IS:\n\t: {custom_prompt}")
             text_input += custom_prompt
 
-        if input_file:
-            print(f"===> READING INPUT FILE:\n\t{input_file.name}")
-            try:
-                file_content = input_file.read()
-                text_input += "Please analyze the additional file attachments together with the provided materials. \n"
-                text_input += "File attachments as follows: \n"
-                text_input += file_content
-                text_input += "\n"
-            except Exception as e:
-                self.logger.error(f"Failed to read input file: {str(e)}")
-                return
+        file_content = self._get_input_file_content()
+        if file_content:
+            text_input += "Please analyze the additional file attachments together with the provided materials. \n"
+            text_input += "File attachments as follows: \n"
+            text_input += file_content
+            text_input += "\n"
 
         if not (api_token and endpoint and llm_model):
             self.logger.warning(
@@ -705,8 +706,7 @@ class CodeTrailExecutor:
                 date_str = datetime.datetime.now().strftime("%Y%m%d")
 
             repo_dir = os.path.join(output_dir, repo_name)
-            if not os.path.exists(repo_dir):
-                os.makedirs(repo_dir)
+            os.makedirs(repo_dir, exist_ok=True)
 
             output_filename = os.path.join(repo_dir, f"{repo_name}_{date_str}_{commit_hash}_cook.json")
             

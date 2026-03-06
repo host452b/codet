@@ -91,7 +91,7 @@ class Logger:
             stack_info (bool): Whether to include stack info, defaults to False
         """
         import traceback
-        stack_trace = "\n" + traceback.format_stack()[:-1]
+        stack_trace = "\n" + "".join(traceback.format_stack()[:-1])
         self.logger.error(f"{message}{stack_trace if stack_info else ''}", exc_info=exc_info)
     
     def critical(self, message: str):

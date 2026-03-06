@@ -76,19 +76,23 @@ class GitAnalyzer:
             self.logger.info(f"\tLoaded repository: {repo_name}, path: {repo_path}")
 
     def generate_commit_url(self, repo_url, commit_id):
-        """Generate an HTTPS URL to view specific commit in remote repository"""
+        """Generate an HTTPS URL to view specific commit in remote repository.
+        auto-detects GitHub (uses /commit/) vs GitLab (uses /-/commit/).
+        """
         try:
-            # Remove 'https://' prefix if exists for standardized parsing
             if repo_url.startswith("https://"):
                 repo_path = repo_url.rsplit(".git", 1)[0]
-                https_url = f"{repo_path}/-/commit/{commit_id[:7]}"
+                host = repo_path.split("//")[1].split("/")[0]
             else:
-                parts = repo_url.split("@")[-1].split(":")  # Get host and path components
-                host = parts[0].split("/")[0]  # Extract hostname only, remove port
-                repo_path_parts = parts[1].split("/")
-                repo_path = "/".join(repo_path_parts[1:]).rsplit(".git", 1)[0]
-                https_url = f"https://{host}/{repo_path}/-/commit/{commit_id[:7]}"
-            return https_url
+                parts = repo_url.split("@")[-1].split(":")
+                host = parts[0].split("/")[0]
+                path_part = parts[1].rsplit(".git", 1)[0]
+                repo_path = f"https://{host}/{path_part}"
+
+            # github uses /commit/, gitlab and others use /-/commit/
+            if "github.com" in host:
+                return f"{repo_path}/commit/{commit_id[:7]}"
+            return f"{repo_path}/-/commit/{commit_id[:7]}"
         except Exception:
             return ""
     
@@ -98,12 +102,9 @@ class GitAnalyzer:
         
         Args:
             days_back: How many days back to query commit records
-            author_emails: Filter by author emails
-            author_names: Filter by author names
-            repo_path: Specify repository path, defaults to all repositories
             
         Returns:
-            List of commit records
+            OrderedDict of {repo_name: {commit_hash: commit_data}}
         """
         since_date = datetime.now() - timedelta(days=days_back)
         
@@ -133,10 +134,7 @@ class GitAnalyzer:
                 commit_files_changed = len(commit.stats.files)
                 commit_insertions = commit.stats.total['insertions']
                 commit_deletions = commit.stats.total['deletions']
-                commit_tree_hexsha = commit.tree.hexsha
                 commit_committed_time = datetime.fromtimestamp(commit.committed_date)
-                commit_encoding = commit.encoding
-                commit_type = commit.type
                 commit_message = commit.message
                 
                 # Check if commit has deleted, new or renamed files
@@ -167,9 +165,6 @@ class GitAnalyzer:
                         if diff_item.diff:
                             diff_text = diff_item.diff.decode('utf-8', errors='replace')
                             commit_diffs_txt += diff_text
-                    
-
-
 
                 remote_url = repo.remotes.origin.url if repo.remotes else ""
                 commit_url = self.generate_commit_url(remote_url, commit.hexsha)

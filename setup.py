@@ -5,13 +5,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="codet",
-    version="1.0.8",
+    version="1.0.9",
     author="clemente0620",
-    author_email="clemente0620@gmail.com",
+    author_email="",
     description="A cross-platform command-line tool for file processing and Git repository analysis with support for commit history tracking, code hotspot detection, and customizable filtering options",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/clemente0731/codet",
+    url="https://github.com/host452b/codet",
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
