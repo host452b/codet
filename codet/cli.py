@@ -57,7 +57,7 @@ def main():
         ),
         epilog=(
             "Additional:\n"
-            f"\tFor more details, visit the documentation or contact clemente0620@gmail.com "
+            f"\tFor more details, visit https://github.com/host452b/codet"
         ),
         formatter_class=CustomFormatter,
     )
