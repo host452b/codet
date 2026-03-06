@@ -94,9 +94,14 @@ class CodeTrailExecutor:
 
     def raw(self):
         """Collect raw commit data from all repositories"""
+        if not self.git_analyzer:
+            self.logger.error(
+                "No git repositories found under the given path. "
+                "Make sure subdirectories contain .git, or use -p to specify a different root."
+            )
+            return
+
         self.logger.info("Starting to collect raw commit data")
-        
-        # Calculate date range
         from_date = (datetime.datetime.now() - datetime.timedelta(days=self.args.days)).strftime('%Y-%m-%d')
         self.logger.info(f"Collecting commits since {from_date}")
         self.raw_commits = self.git_analyzer.get_all_commits(days_back=self.args.days)
@@ -110,17 +115,7 @@ class CodeTrailExecutor:
             self.logger.warning("No matching commits found")
             return
 
-        # Check conditions (union mode vs intersection mode)
-        # Default is union mode (match any condition)
-        # Search mode explanation:
-        # 1. Union Mode: Include commit if it matches ANY filter condition (email, username, keyword or commit hash)
-        #    Example: If email A and keyword B specified, include commits with email A OR containing keyword B
-        # 2. Intersection Mode: Include commit only if it matches ALL specified filter conditions
-        #    Example: If email A and keyword B specified, include commits only with email A AND containing keyword B
-        self.logger.info("Union mode: match any condition")
-        self.logger.info("Intersection mode: must match all conditions")
-
-        union_mode = self.args.mode == "union"  # Check mode based on args.mode
+        union_mode = self.args.mode == "union"
         if union_mode:
             self.logger.info("[Search Mode] Using Union Mode - Match any condition")
             self.logger.info("  Union mode: commit included if it matches any email, username, keyword or commit hash condition")
@@ -415,7 +410,8 @@ class CodeTrailExecutor:
         self.logger.info("\nHotspot analysis complete")
 
     def ai_analysis(self, text_input):
-        from openai import AzureOpenAI
+        from openai import OpenAI
+
         api_token = self.args.api_token
         endpoint = self.args.openai_endpoint
         llm_model = self.args.model
@@ -439,36 +435,47 @@ class CodeTrailExecutor:
                 return
 
         if not (api_token and endpoint and llm_model):
-            self.logger.warning(">>-------> No API token or endpoint or model provided, skipping AI analysis <-------<< ")
+            self.logger.warning(
+                "AI analysis skipped: requires --api-token (-to), "
+                "--openai-endpoint (-oe), and --model (-mo)"
+            )
             return
-        
-        client = AzureOpenAI(
-            api_version="2024-02-15-preview",
-            azure_endpoint=endpoint,
+
+        # normalize endpoint: strip trailing slash, append /v1 if not present
+        base_url = endpoint.rstrip("/")
+        if not base_url.endswith("/v1"):
+            base_url += "/v1"
+
+        client = OpenAI(
             api_key=api_token,
-        )
-        
-        chat_completion = client.chat.completions.create(
-            model=llm_model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": text_input,
-                }
-            ],
-            temperature=0.5,  # higher temperature means more creative
-            top_p=0.7,        # higher top_p means more creative
-            max_tokens=1024 * 4,  # max tokens to generate
-            stream=True,
+            base_url=base_url,
         )
 
-        full_reply = ""
-        for chunk in chat_completion:
-            if chunk.choices and chunk.choices[0].delta.content:
-                full_reply += chunk.choices[0].delta.content
-        print("=========================================== ")
-        print(full_reply)
-        return full_reply
+        try:
+            chat_completion = client.chat.completions.create(
+                model=llm_model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": text_input,
+                    }
+                ],
+                temperature=0.5,
+                top_p=0.7,
+                max_tokens=1024 * 4,
+                stream=True,
+            )
+
+            full_reply = ""
+            for chunk in chat_completion:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    full_reply += chunk.choices[0].delta.content
+            print("=========================================== ")
+            print(full_reply)
+            return full_reply
+        except Exception as e:
+            self.logger.error(f"AI API call failed ({base_url}): {e}")
+            return None
 
 
     def generate_report(self):
@@ -495,22 +502,26 @@ class CodeTrailExecutor:
         
         def process_commit(repo_name, commit_hash, commit_data):
             """Process a single commit and return the formatted text"""
+            keywords = ""
+            if hasattr(self, 'args') and hasattr(self.args, 'keyword') and self.args.keyword:
+                keywords = ", ".join(self.args.keyword)
+
             pre_prompt = (
                 "\n"
-                "As an expert in the current {0} project, you need analyze the Git commit message and diff info related to '{1}' feature. Answer these questions:\n"
-                "1. What are the main changes in this commit for {0}.\n"
-                "2. What problems might these changes solve for {0}.\n"
-                "3. Extract key info from the commit message and explain how it describes the code submission for {0}.\n"
-                "4. Analyze the relationship between the submitted code and its description. Point out which code implements the goals in the commit message for {0}.\n"
-                "5. Evaluate the impact of this commit on the project. Which files or functionalities are affected for {0}.\n"
-                "6. Explain the context and significance of this commit. Does it address issues or implement new features for {0}.\n"
-                "7. If there are changes involving \"tests/trt-test-defs/\", please briefly mention the impact of these changes for {0}.\n"
-                "8. Don't explaining abbreviations.\n"
+                "As an expert in the current {0} project, analyze the Git commit message and diff info"
+                "{1}. Answer these questions:\n"
+                "1. What are the main changes in this commit.\n"
+                "2. What problems might these changes solve.\n"
+                "3. Extract key info from the commit message and explain how it describes the code submission.\n"
+                "4. Analyze the relationship between the submitted code and its description. Point out which code implements the goals in the commit message.\n"
+                "5. Evaluate the impact of this commit on the project. Which files or functionalities are affected.\n"
+                "6. Explain the context and significance of this commit. Does it address issues or implement new features.\n"
+                "7. If there are changes involving test files, please briefly mention the impact.\n"
                 "\n"
-                "the output should not include the above rules and requirements; it should be naturally integrated.\n"
+                "The output should not include the above rules and requirements; it should be naturally integrated.\n"
             ).format(
                 repo_name,
-                self.args.keyword if hasattr(self, 'args') and hasattr(self.args, 'keyword') else ""
+                f" related to '{keywords}'" if keywords else ""
             )
 
             ai_input_text = (

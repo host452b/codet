@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/codet.svg)](https://pypi.org/project/codet/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/clemente0731/codet/actions/workflows/python-package-conda.yml/badge.svg)](https://github.com/clemente0731/codet/actions)
+[![CI](https://github.com/host452b/codet/actions/workflows/python-package-conda.yml/badge.svg)](https://github.com/host452b/codet/actions)
 
 A cross-platform command-line tool for Git repository analysis. Profile commit history, detect code hotspots, generate diff reports, and optionally leverage AI for deeper insights. The generated git diff files integrate seamlessly with Cursor for collaborative development.
 
@@ -28,7 +28,7 @@ pip install codet
 ### From source
 
 ```bash
-git clone https://github.com/clemente0731/codet.git
+git clone https://github.com/host452b/codet.git
 cd codet
 pip install -e .
 ```
@@ -85,14 +85,26 @@ usage: codet [-h] [--version] [-d DAYS] [-e EMAIL] [-u USER] [-k KEYWORD]
 
 ### AI Options
 
+Codet works with **any OpenAI-compatible API** — just pass the endpoint and model name:
+
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-mo`, `--model` | OpenAI model name | `gpt-4.1-20250414` |
-| `-to`, `--api-token` | API token (or set `AI_API_TOKEN` env var) | — |
-| `-oe`, `--openai-endpoint` | Azure OpenAI endpoint URL | — |
+| `-mo`, `--model` | Model name as required by your provider (e.g., `gpt-4.1`, `openai/openai/gpt-5-nano`, `llama3`) | — |
+| `-to`, `--api-token` | Bearer token (or set `AI_API_TOKEN` env var). If not set, AI analysis is skipped | — |
+| `-oe`, `--openai-endpoint` | Base URL of the API (`/v1` is appended automatically if missing) | — |
 | `-cp`, `--custom-prompt` | Custom prompt appended to AI analysis | — |
 | `-f`, `--input-file` | Additional file to include in AI analysis | — |
 | `-oj`, `--output-cook-json` | Export per-commit JSON reports to `json_cook/` | `False` |
+
+**Examples with different providers:**
+
+```bash
+# Standard OpenAI
+codet -d 10 -s -to $OPENAI_KEY -oe "https://api.openai.com/v1" -mo "gpt-4.1"
+
+# Local Ollama
+codet -d 10 -s -to ollama -oe "http://localhost:11434/v1" -mo "llama3"
+```
 
 ## Dashboard
 
@@ -116,7 +128,7 @@ With `-oj`, per-commit JSON files are written to `json_cook/<repo_name>/`, each 
 ## Development
 
 ```bash
-git clone https://github.com/clemente0731/codet.git
+git clone https://github.com/host452b/codet.git
 cd codet
 pip install -e ".[dev]"
 

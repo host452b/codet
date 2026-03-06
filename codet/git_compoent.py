@@ -7,10 +7,9 @@ Git repository operation wrapper module - Support parallel processing of multipl
 
 import os
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Set
+from typing import List
 from git.repo import Repo
 from collections import OrderedDict
-from pprint import pprint
 from tqdm import tqdm
 
 class GitAnalyzer:
@@ -90,7 +89,7 @@ class GitAnalyzer:
                 repo_path = "/".join(repo_path_parts[1:]).rsplit(".git", 1)[0]
                 https_url = f"https://{host}/{repo_path}/-/commit/{commit_id[:7]}"
             return https_url
-        except:
+        except Exception:
             return ""
     
     def get_all_commits(self, days_back):
@@ -113,13 +112,6 @@ class GitAnalyzer:
         for repo_name, repo in tqdm(self.repo_meta.items(), desc="Processing repositories progress"):
             self.all_commits[repo_name] = OrderedDict()
             
-            # Get all commits within specified date range
-            # Get all commits within specified date range
-            # print(repo.active_branch,"ssssss")
-            # pprint(dir(repo))
-            # pprint(repo.tags)
-            # pprint(repo.tree)
-            # pprint(repo.branches)
             try:
                 # Try to get the active branch
                 # This handles normal repositories with a current branch
@@ -168,47 +160,13 @@ class GitAnalyzer:
                         # Record changed files
                         commit_changed_files.append(diff_item.b_path if diff_item.b_path else diff_item.a_path)
                 
-                # Use logger to record information
-                # self.logger.info(f"Repository: {repo_name}, Commit ID: {commit_id}, Author: {commit_author_name}, Email: {commit_author_email}")
-                # self.logger.info(f"Commit time: {commit_authored_time}, Commit message: {commit_summary}")
-                # self.logger.info(f"Changed files: {commit_files_changed}, Total additions: {commit_insertions}, Total deletions: {commit_deletions}")
-                # self.logger.info(f"Tree object: {commit_tree_hexsha} - Tree object represents file system snapshot at commit time, can be used to analyze file structure, content and directory hierarchy, also can compare file changes between different commits")
-                # self.logger.info(f"Commit time conversion: {commit_committed_time} - Time when code was actually committed to repository")
-                # self.logger.info(f"Encoding: {commit_encoding}")
-                # self.logger.info(f"Type: {commit_type}")
-                # self.logger.info("Full commit message:")
-                # self.logger.info(commit_message)
-                
-                # Print Diff information
-                # print("Change details:")
-                parent_commit = None
-                if commit.parents:
-                    parent_commit = commit.parents[0]
-                
-                # set function_context=True make more context for diff
-                # diff method parameters:
-                # parent_commit: Parent commit object to compare with current commit
-                # create_patch=True: Generate complete patch information including specific code changes
-                # unified=10: Number of context lines around changed lines, set to 10 here
-                # function_context=True: Preserve function context to show complete function containing changes
-                # Create variable to store all diff information for single commit
                 commit_diffs_txt = ""
-                # 如果需要完整的函数上下文，则设置function_context=True
-                # get diff between parent commit and current commit
-                for diff_item in parent_commit.diff(commit, create_patch=True, unified=20, function_context=True):
-                    # print(f"  [Commit Diff Item - File Path]: {diff_item.b_path} -> {diff_item.a_path}")
-                    # print(f"  [Commit Diff Item - Diff Content]: {diff_item.diff}")
-                    # print(f"  [Commit Diff Item - File Status]: deleted_file = {diff_item.deleted_file} - Indicates whether this file was deleted in this commit")
-                    # print(f"  [Commit Diff Item - File Status]: new_file = {diff_item.new_file} - Indicates whether this is a newly created file in this commit")
-                    # print(f"  [Commit Diff Item - File Status]: renamed = {diff_item.renamed} - Indicates whether this file was renamed in this commit")
-                    # print(f"  [Commit Diff Item - Source Path]: a_path = {diff_item.a_path} - The file path before the change (in parent commit)")
-                    # print(f"  [Commit Diff Item - Target Path]: b_path = {diff_item.b_path} - The file path after the change (in current commit)")
-
-                    # convert binary diff content to string and split by lines for readability 
-                    if diff_item.diff:
-                        diff_text = diff_item.diff.decode('utf-8', errors='replace')
-                        # self.logger.info(diff_text)
-                        commit_diffs_txt += diff_text
+                parent_commit = commit.parents[0] if commit.parents else None
+                if parent_commit:
+                    for diff_item in parent_commit.diff(commit, create_patch=True, unified=20, function_context=True):
+                        if diff_item.diff:
+                            diff_text = diff_item.diff.decode('utf-8', errors='replace')
+                            commit_diffs_txt += diff_text
                     
 
 

@@ -42,30 +42,6 @@ class Colors:
     END = "\033[0m"
 
 
-def create_parser():
-    """Create command line argument parser"""
-    parser = argparse.ArgumentParser(
-        description="Codet - A cross-platform command line file processing tool"
-    )
-
-    return parser
-
-
-def process_file(args):
-    """Function to process files"""
-    print(f"Processing file: {args.file}")
-    if args.output:
-        print(f"Output to: {args.output}")
-    # Add file processing logic here
-
-
-def scan_directory(args):
-    """Function to scan directories"""
-    print(f"Scanning directory: {args.directory}")
-    print(f"Recursive mode: {'enabled' if args.recursive else 'disabled'}")
-    # Add directory scanning logic here
-
-
 def main():
     """CLI main entry function"""
     print(HELLO_CODET)
@@ -168,33 +144,45 @@ def main():
     )
     #########################################################
     # AI PART OPTIONS
+    # supports any OpenAI-compatible API gateway:
+    #   - OpenAI, Azure OpenAI, Ollama, vLLM,
+    #     LiteLLM, or any OpenAI-compatible gateway.
+    # just pass the endpoint via -oe and model via -mo.
     #########################################################
-    # add openai model argument
     parser.add_argument(
         "-mo",
         "--model",
         type=str,
-        default="gpt-4.1-20250414",
-        help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} Specify the openai model to use (default: gpt-4.1-20250414)"
+        default=None,
+        help=(
+            f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} "
+            "Model name as required by your API provider "
+            "(e.g., gpt-4.1, openai/openai/gpt-5-nano, llama3)"
+        ),
     )
-    # add api-token argument for AI analysis
     parser.add_argument(
         "-to",
         "--api-token",
         type=str,
         default=None,
         help=(
-            f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} If token is not set or is incorrectly configured, AI analysis will be skipped. "
-            "If the environment variable AI_API_TOKEN is set, it will override this value."
+            f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} "
+            "Bearer token for the AI endpoint. "
+            "If env var AI_API_TOKEN is set, it will override this value. "
+            "If not provided, AI analysis is skipped."
         ),
     )
-    # add openai endpoint argument
     parser.add_argument(
         "-oe",
         "--openai-endpoint",
         type=str,
         default=None,
-        help=f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} Specify the openai endpoint (default: None)"
+        help=(
+            f"{Colors.GREEN}{Colors.BOLD}[Optional]{Colors.END} "
+            "Base URL of any OpenAI-compatible API "
+            "(e.g., https://api.openai.com/v1, "
+            "http://localhost:11434/v1)"
+        ),
     )
     # add custom prompt argument
     parser.add_argument(
