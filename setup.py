@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="codet",
-    version="1.0.9",
+    version="1.1.0",
     author="clemente0620",
     author_email="",
     description="A cross-platform command-line tool for file processing and Git repository analysis with support for commit history tracking, code hotspot detection, and customizable filtering options",

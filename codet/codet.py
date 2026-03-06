@@ -475,7 +475,20 @@ class CodeTrailExecutor:
             print(full_reply)
             return full_reply
         except Exception as e:
-            self.logger.error(f"AI API call failed ({base_url}): {e}")
+            import re
+            sanitized = re.sub(
+                r'(API Key|Key Hash|Token|api_key|Bearer)\s*[=:]\s*\S+',
+                r'\1=***',
+                str(e)
+            )
+            error_str = str(e).lower()
+            if '401' in error_str or 'auth' in error_str:
+                self.logger.error(
+                    f"AI authentication failed ({base_url}). "
+                    "Check your --api-token (-to) value."
+                )
+            else:
+                self.logger.error(f"AI API call failed ({base_url}): {sanitized}")
             return None
 
 
